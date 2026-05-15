@@ -8,7 +8,8 @@ export default function ColorPicker({ value, onChange }) {
           key={color}
           type="button"
           aria-label={`Use ${color}`}
-          className={`size-6 rounded border ${value === color ? 'border-ink' : 'border-line'}`}
+          className={`app-tooltip size-6 rounded border ${value === color ? 'border-ink' : 'border-line'}`}
+          data-tooltip={`Use ${color}`}
           style={{ backgroundColor: color }}
           onClick={() => onChange?.(color)}
         />

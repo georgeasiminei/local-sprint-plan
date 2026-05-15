@@ -195,15 +195,15 @@ function findPastWeekForTaskIds(document, taskIds) {
 
   const impactedWeekIndexes = [
     ...(document.schedule ?? [])
-      .filter((entry) => taskIds.has(entry.taskId))
+      .filter((entry) => taskIds.has(entry.taskId) && (entry.allocatedUnits ?? 0) > 0)
       .map((entry) => entry.weekIndex),
     ...(document.tasks ?? [])
       .filter((task) => taskIds.has(task.id))
-      .flatMap((task) => (task.resourceOverrides ?? []).map((override) => override.weekIndex)),
-    ...(document.tasks ?? [])
-      .filter((task) => taskIds.has(task.id))
-      .map((task) => task.earliestStartWeek ?? document.plan?.startWeek)
-      .filter(Boolean),
+      .flatMap((task) =>
+        (task.resourceOverrides ?? [])
+          .filter((override) => (override.allocatedUnits ?? 0) > 0)
+          .map((override) => override.weekIndex),
+      ),
   ];
 
   return impactedWeekIndexes

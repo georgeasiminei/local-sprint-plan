@@ -19,7 +19,7 @@ export function recalculateSchedule(document) {
   const sprintStartNumber = Number(document.plan?.sprintStartNumber) || 1;
   const sprintStartOrder = Number(document.plan?.sprintStartOrder) || 1;
   const startingResourceCount = Number(document.plan?.startingResourceCount) || 0;
-  const { sortedIds, hasCycle } = topologicalSort(tasks, dependencies);
+  const { sortedIds, hasCycle, cycleNodes } = topologicalSort(tasks, dependencies);
 
   if (hasCycle) {
     const weeks = buildCalculatedWeeks(startWeek, document.weeks?.length || MIN_VISIBLE_WEEKS, startYear);
@@ -28,7 +28,11 @@ export function recalculateSchedule(document) {
       weeks,
       sprints: buildFixedSprints(weeks, sprintStartNumber, sprintStartOrder),
       schedule: [],
-      warnings: ['Dependency cycle detected.'],
+      warnings: [
+        cycleNodes.length > 0
+          ? `Dependency cycle detected involving ${cycleNodes.join(', ')}.`
+          : 'Dependency cycle detected.',
+      ],
     };
   }
 

@@ -61,7 +61,8 @@ export default function GridHeader({ weeks = [], sprints = [], weekColumnWidth }
                 ) : (
                   <button
                     type="button"
-                    className="w-full rounded px-1 py-0.5 hover:bg-white"
+                    className="app-tooltip w-full rounded px-1 py-0.5 hover:bg-white"
+                    data-tooltip={`Edit ${sprint.name}`}
                     onClick={() => setEditingSprintId(sprint.id)}
                   >
                     {sprint.name}
@@ -77,7 +78,8 @@ export default function GridHeader({ weeks = [], sprints = [], weekColumnWidth }
               <button
                 key={week.id}
                 type="button"
-                className="border-r border-line px-1.5 py-1 text-center text-[11px] font-medium hover:bg-white"
+                className="app-tooltip border-r border-line px-1.5 py-1 text-center text-[11px] font-medium hover:bg-white"
+                data-tooltip={`Open ${week.label}`}
                 onClick={() => selectWeek(week.weekIndex)}
               >
                 {week.label}

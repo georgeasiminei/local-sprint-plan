@@ -71,7 +71,7 @@ export function compactPlanDocument(document) {
         category.order !== index + 1 ? category.order : null,
         encodeColor(category.color),
         category.collapsed ? 1 : null,
-        compactPairs(category.vacations, (vacation) => [vacation.weekIndex, vacation.dayCount]),
+        compactRows(category.vacations, (vacation) => [vacation.weekIndex, vacation.dayCount]),
       ]),
     ),
     compactRows(document.tasks, (task, index) =>
@@ -84,7 +84,7 @@ export function compactPlanDocument(document) {
         task.notes || null,
         task.earliestStartWeek ?? null,
         task.maxResources ?? null,
-        compactPairs(task.resourceOverrides, (override) => [override.weekIndex, override.allocatedUnits]),
+        compactRows(task.resourceOverrides, (override) => [override.weekIndex, override.allocatedUnits]),
       ]),
     ),
     compactRows(document.dependencies, (dependency) =>
@@ -142,7 +142,7 @@ export function expandCompactPlanDocument(compactDocument) {
     order: category[1] ?? index + 1,
     color: decodeColor(category[2]),
     collapsed: Boolean(category[3]),
-    vacations: expandPairs(category[4]),
+    vacations: expandWeekValuePairs(category[4]).map(({ weekIndex, value }) => ({ weekIndex, dayCount: value })),
   }));
   const tasks = (compactDocument[2] ?? []).map((task = [], index) => ({
     id: `t${index + 1}`,
@@ -155,9 +155,9 @@ export function expandCompactPlanDocument(compactDocument) {
     notes: task[5] ?? '',
     earliestStartWeek: task[6] ?? null,
     maxResources: task[7] ?? null,
-    resourceOverrides: expandPairs(task[8]).map(({ weekIndex, dayCount }) => ({
+    resourceOverrides: expandWeekValuePairs(task[8]).map(({ weekIndex, value }) => ({
       weekIndex,
-      allocatedUnits: dayCount,
+      allocatedUnits: value,
     })),
   }));
   const dependencies = (compactDocument[3] ?? []).map((dependency = [], index) => ({
@@ -208,7 +208,7 @@ export function expandCompactPlanDocument(compactDocument) {
       sprintStartOrder,
       startingResourceCount: planRow[6] ?? teams[0]?.resourceCount ?? DEFAULT_RESOURCE_COUNT,
       rowHeight: planRow[7] ?? DEFAULT_ROW_HEIGHT,
-      vacations: expandPairs(planRow[8]),
+      vacations: expandWeekValuePairs(planRow[8]).map(({ weekIndex, value }) => ({ weekIndex, dayCount: value })),
       weekColumnWidth: planRow[9] ?? DEFAULT_WEEK_COLUMN_WIDTH,
       createdAt: now,
       updatedAt: now,
@@ -343,7 +343,7 @@ function compactPlan(plan, { firstWeekIndex, sprintStartNumber, sprintStartOrder
     sprintStartOrder !== 1 ? sprintStartOrder : null,
     plan?.startingResourceCount !== DEFAULT_RESOURCE_COUNT ? plan?.startingResourceCount : null,
     plan?.rowHeight && plan.rowHeight !== DEFAULT_ROW_HEIGHT ? plan.rowHeight : null,
-    compactPairs(plan?.vacations, (vacation) => [vacation.weekIndex, vacation.dayCount]),
+    compactRows(plan?.vacations, (vacation) => [vacation.weekIndex, vacation.dayCount]),
     plan?.weekColumnWidth && plan.weekColumnWidth !== DEFAULT_WEEK_COLUMN_WIDTH ? plan.weekColumnWidth : null,
   ]);
 }
@@ -388,15 +388,10 @@ function decodeColor(value) {
   return value ?? null;
 }
 
-function compactPairs(items = [], mapper) {
-  const rows = compactRows(items, mapper);
-  return rows;
-}
-
-function expandPairs(rows = []) {
+function expandWeekValuePairs(rows = []) {
   return rows.map((row = []) => ({
     weekIndex: row[0],
-    dayCount: row[1] ?? 0,
+    value: row[1] ?? 0,
   }));
 }
 
@@ -447,7 +442,7 @@ function decodeHashEscapes(payload) {
 
 async function compressBytes(bytes) {
   if (typeof CompressionStream !== 'function') {
-    throw new Error('URL state compression requires CompressionStream support in Chrome or Edge.');
+    throw new Error('URL state compression is not supported in your current browser.');
   }
 
   const stream = bytesToStream(bytes).pipeThrough(new CompressionStream('deflate-raw'));
@@ -456,7 +451,7 @@ async function compressBytes(bytes) {
 
 async function decompressBytes(bytes) {
   if (typeof DecompressionStream !== 'function') {
-    throw new Error('URL state compression requires DecompressionStream support in Chrome or Edge.');
+    throw new Error('URL state compression is not supported in your current browser.');
   }
 
   const stream = bytesToStream(bytes).pipeThrough(new DecompressionStream('deflate-raw'));

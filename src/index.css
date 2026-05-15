@@ -23,3 +23,35 @@ select,
 textarea {
   font: inherit;
 }
+
+.app-tooltip {
+  position: relative;
+  overflow: visible;
+}
+
+.app-tooltip[data-tooltip]::after {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 30;
+  max-width: 18rem;
+  transform: translate(-50%, -4px);
+  border-radius: 0.25rem;
+  background: #0f172a;
+  color: white;
+  content: attr(data-tooltip);
+  opacity: 0;
+  padding: 0.25rem 0.5rem;
+  pointer-events: none;
+  text-align: center;
+  transition:
+    opacity 100ms ease 100ms,
+    transform 100ms ease 100ms;
+  white-space: nowrap;
+}
+
+.app-tooltip[data-tooltip]:hover::after,
+.app-tooltip[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}

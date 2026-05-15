@@ -203,4 +203,20 @@ describe('recalculateSchedule', () => {
 
     expect(result.weeks.at(-1).weekIndex).toBe(14);
   });
+
+  it('names the tasks involved when reporting dependency cycles', () => {
+    const document = createPlanDocument({ startWeek: 1, startingResourceCount: 5 });
+    document.tasks = [
+      { id: 'task-1', name: 'First', priority: 1, estimateWeeks: 1 },
+      { id: 'task-2', name: 'Second', priority: 2, estimateWeeks: 1 },
+    ];
+    document.dependencies = [
+      { id: 'dep-1', predecessorId: 'task-1', successorId: 'task-2' },
+      { id: 'dep-2', predecessorId: 'task-2', successorId: 'task-1' },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.warnings).toContain('Dependency cycle detected involving task-1, task-2.');
+  });
 });

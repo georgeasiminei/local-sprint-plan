@@ -1,6 +1,8 @@
 import { DEFAULT_PLAN_NAME, DEFAULT_ROW_HEIGHT, DEFAULT_WEEK_COLUMN_WIDTH } from '../constants/defaults.js';
 import { createPlanDocument } from '../persistence/schema.js';
 
+const MAX_UNDO_STACK = 50;
+
 export function createPlanSlice(set, get) {
   return {
     activePlanId: null,
@@ -94,7 +96,7 @@ export function createPlanSlice(set, get) {
                 weekIndex: resource.weekIndex + startWeekDelta,
               }));
         const weekResources =
-          startingResourceCount === undefined || !firstTeamId
+          patch.startingResourceCount === undefined || !firstTeamId
             ? shiftedWeekResources
             : [
                 ...shiftedWeekResources.filter(
@@ -222,7 +224,7 @@ export function createPlanSlice(set, get) {
             document.plan.id === activePlanId ? nextDocument : document,
           ),
           redoStack: state.redoStack.slice(0, -1),
-          undoStack: [...state.undoStack, currentDocument],
+          undoStack: [...state.undoStack, currentDocument].slice(-MAX_UNDO_STACK),
           saveStatus: 'unsaved',
         };
       });
@@ -243,7 +245,9 @@ export function createPlanSlice(set, get) {
         undoStack:
           options.skipUndo || options.skipSaveStatus
             ? state.undoStack
-            : [...state.undoStack, state.plans.find((document) => document.plan.id === activePlanId)].filter(Boolean),
+            : [...state.undoStack, state.plans.find((document) => document.plan.id === activePlanId)]
+                .filter(Boolean)
+                .slice(-MAX_UNDO_STACK),
         redoStack: options.skipUndo || options.skipSaveStatus ? state.redoStack : [],
         saveStatus: options.skipSaveStatus ? state.saveStatus : 'unsaved',
       }));

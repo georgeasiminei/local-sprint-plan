@@ -1,8 +1,22 @@
-import { FileSpreadsheet, FolderOpen, FolderPlus, GitBranchPlus, MoveHorizontal, Plus, Save, Settings } from 'lucide-react';
+import {
+  Braces,
+  FileSpreadsheet,
+  FolderOpen,
+  FolderPlus,
+  GitBranchPlus,
+  MoveHorizontal,
+  Plus,
+  Redo2,
+  Save,
+  Settings,
+  Undo2,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useSchedule } from '../hooks/useSchedule.js';
+import { useUndoRedo } from '../hooks/useUndoRedo.js';
 import { useTimelineStore } from '../store/index.js';
-import { downloadCsv, exportScheduleCsv } from '../persistence/exportPlan.js';
+import { downloadCsv, downloadJson, exportScheduleCsv } from '../persistence/exportPlan.js';
+import { compactPlanDocument, expandCompactPlanDocument } from '../persistence/shareUrl.js';
 import Button from '../components/ui/Button.jsx';
 import TimelineGrid from '../components/timeline/TimelineGrid.jsx';
 import BulkShiftModal from '../components/panels/BulkShiftModal.jsx';
@@ -42,6 +56,9 @@ export default function PlanView() {
   const hydratePlan = useTimelineStore((state) => state.hydratePlan);
   const setImportError = useTimelineStore((state) => state.setImportError);
   const setSavedPlan = useTimelineStore((state) => state.setSavedPlan);
+  const undo = useTimelineStore((state) => state.undo);
+  const redo = useTimelineStore((state) => state.redo);
+  const { canUndo, canRedo } = useUndoRedo();
 
   if (!document) {
     return null;
@@ -64,6 +81,14 @@ export default function PlanView() {
     downloadCsv(
       `${document.plan.name.replaceAll(' ', '-').toLowerCase()}-schedule-${today}.csv`,
       exportScheduleCsv(document),
+    );
+  }
+
+  function exportActivePlanJson() {
+    const today = new Date().toISOString().slice(0, 10);
+    downloadJson(
+      `${document.plan.name.replaceAll(' ', '-').toLowerCase()}-${today}.json`,
+      JSON.stringify(compactPlanDocument(document)),
     );
   }
 
@@ -103,6 +128,16 @@ export default function PlanView() {
     }
   }
 
+  async function loadJsonFile(file) {
+    try {
+      const compactDocument = JSON.parse(await readFileText(file));
+      hydratePlan(expandCompactPlanDocument(compactDocument));
+      setIsLoadModalOpen(false);
+    } catch (error) {
+      setImportError(`Could not load JSON file. ${error.message}`);
+    }
+  }
+
   return (
     <div className={isSidebarOpen ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]' : 'grid gap-4'}>
       <section className="min-w-0 rounded border border-line bg-white shadow-panel">
@@ -117,17 +152,84 @@ export default function PlanView() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" className="text-xs" onClick={() => addCategory()}>
-              <FolderPlus size={16} />
-              Category
+            <Button
+              variant="ghost"
+              className="size-9 p-0"
+              onClick={saveCurrentPlan}
+              aria-label="Save"
+              tooltip="Save to local storage"
+            >
+              <Save size={18} />
             </Button>
-            <Button variant="secondary" className="text-xs" onClick={showDependencyPanel}>
-              <GitBranchPlus size={16} />
+            <Button
+              variant="ghost"
+              className="size-9 p-0"
+              onClick={() => setIsSaveAsModalOpen(true)}
+              aria-label="Save as"
+              tooltip="Save as a new local-storage snapshot"
+            >
+              <Save size={18} />
+            </Button>
+            <Button
+              variant="ghost"
+              className="size-9 p-0"
+              onClick={openLoadModal}
+              aria-label="Load"
+              tooltip="Load from local storage or JSON file"
+            >
+              <FolderOpen size={18} />
+            </Button>
+            <Button
+              variant="ghost"
+              className="size-9 p-0"
+              onClick={undo}
+              disabled={!canUndo}
+              aria-label="Undo"
+            >
+              <Undo2 size={18} />
+            </Button>
+            <Button
+              variant="ghost"
+              className="size-9 p-0"
+              onClick={redo}
+              disabled={!canRedo}
+              aria-label="Redo"
+            >
+              <Redo2 size={18} />
+            </Button>
+            <Button variant="ghost" className="size-9 p-0" onClick={showSettingsPanel} aria-label="Settings">
+              <Settings size={18} />
+            </Button>
+            <Button variant="ghost" className="size-9 p-0" onClick={exportActivePlanCsv} aria-label="Export CSV">
+              <FileSpreadsheet size={18} />
+            </Button>
+            <Button variant="ghost" className="size-9 p-0" onClick={exportActivePlanJson} aria-label="Export JSON">
+              <Braces size={18} />
+            </Button>
+            <span className="mx-1 h-6 w-px bg-line" aria-hidden="true" />
+            <Button className="text-xs" onClick={addStarterRows} aria-label="New task" tooltip="New Task">
+              <Plus size={18} />
+              Task
+            </Button>
+            <Button
+              variant="secondary"
+              className="text-xs"
+              onClick={showDependencyPanel}
+              aria-label="New dependency"
+              tooltip="New Dependency"
+            >
+              <GitBranchPlus size={18} />
               Dependency
             </Button>
-            <Button className="text-xs" onClick={addStarterRows}>
-              <Plus size={16} />
-              Task
+            <Button
+              variant="secondary"
+              className="text-xs"
+              onClick={() => addCategory()}
+              aria-label="New category"
+              tooltip="New Category"
+            >
+              <FolderPlus size={18} />
+              Category
             </Button>
             <Button
               variant="secondary"
@@ -135,39 +237,10 @@ export default function PlanView() {
               onClick={openBulkShift}
               disabled={selectedTaskIds.length === 0}
               aria-label="Bulk shift selected tasks by weeks"
-              title="Bulk shift checked tasks by weeks"
+              tooltip="Bulk shift selected tasks by weeks"
             >
-              <MoveHorizontal size={16} />
+              <MoveHorizontal size={18} />
               Shift
-            </Button>
-            <Button variant="ghost" className="text-xs" onClick={exportActivePlanCsv} aria-label="Export CSV">
-              <FileSpreadsheet size={16} />
-            </Button>
-            <Button
-              variant="ghost"
-              className="text-xs"
-              onClick={saveCurrentPlan}
-              title="Save to local storage"
-            >
-              <Save size={16} />
-              Save
-            </Button>
-            <Button
-              variant="ghost"
-              className="text-xs"
-              onClick={() => setIsSaveAsModalOpen(true)}
-              title="Save as a new local-storage snapshot"
-            >
-              <Save size={16} />
-              Save as
-            </Button>
-            <Button variant="ghost" className="text-xs" onClick={openLoadModal} title="Load from local storage">
-              <FolderOpen size={16} />
-              Load
-            </Button>
-            <Button variant="ghost" className="text-xs" onClick={showSettingsPanel} aria-label="Settings">
-              <Settings size={16} />
-              Settings
             </Button>
           </div>
         </header>
@@ -201,8 +274,22 @@ export default function PlanView() {
         open={isLoadModalOpen}
         onClose={() => setIsLoadModalOpen(false)}
         onLoad={loadNamedPlan}
+        onLoadJsonFile={loadJsonFile}
         savedPlans={savedPlans}
       />
     </div>
   );
+}
+
+function readFileText(file) {
+  if (typeof file.text === 'function') {
+    return file.text();
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('load', () => resolve(String(reader.result ?? '')));
+    reader.addEventListener('error', () => reject(reader.error ?? new Error('Could not read file.')));
+    reader.readAsText(file);
+  });
 }
