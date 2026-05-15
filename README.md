@@ -60,3 +60,7 @@ Task cell edits are saved as compact resource rules: setting a task to `x` resou
 - Keep scheduling logic pure and separate from React components.
 - Keep generated build output out of version control.
 - Add schema migrations whenever a breaking document shape change is introduced.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
