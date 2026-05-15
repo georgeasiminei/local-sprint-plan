@@ -13,7 +13,7 @@ export default function TimelineGrid({ document }) {
   const minWidth = LEFT_COLUMN_WIDTH + Math.max(document.weeks.length, 1) * weekColumnWidth;
 
   return (
-    <div className="overflow-auto">
+    <div className="overflow-x-auto overflow-y-hidden">
       <div className="relative" style={{ minWidth }}>
         <GridHeader weeks={document.weeks} sprints={document.sprints} weekColumnWidth={weekColumnWidth} />
         <GridBody document={document} rowHeight={rowHeight} weekColumnWidth={weekColumnWidth} />

@@ -28,7 +28,7 @@ import WeekDetailPanel from '../components/panels/WeekDetailPanel.jsx';
 import PastWeekEditModal from '../components/panels/PastWeekEditModal.jsx';
 import SavePlanModal from '../components/panels/SavePlanModal.jsx';
 import LoadPlanModal from '../components/panels/LoadPlanModal.jsx';
-import { listSavedPlans, loadSavedPlan, savePlanSnapshot } from '../persistence/savedPlans.js';
+import { deleteSavedPlan, listSavedPlans, loadSavedPlan, savePlanSnapshot } from '../persistence/savedPlans.js';
 
 export default function PlanView() {
   useSchedule();
@@ -128,6 +128,18 @@ export default function PlanView() {
     }
   }
 
+  function deleteNamedPlan(savedPlanIdToDelete) {
+    try {
+      deleteSavedPlan(savedPlanIdToDelete);
+      setSavedPlans(listSavedPlans());
+      if (savedPlanId === savedPlanIdToDelete) {
+        setSavedPlan({ id: null, name: null });
+      }
+    } catch (error) {
+      setImportError(error.message);
+    }
+  }
+
   async function loadJsonFile(file) {
     try {
       const compactDocument = JSON.parse(await readFileText(file));
@@ -154,61 +166,61 @@ export default function PlanView() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="ghost"
-              className="size-9 p-0"
+              className="size-11 p-0"
               onClick={saveCurrentPlan}
               aria-label="Save"
               tooltip="Save to local storage"
             >
-              <Save size={18} />
+              <Save size={28} />
             </Button>
             <Button
               variant="ghost"
-              className="size-9 p-0"
+              className="size-11 p-0"
               onClick={() => setIsSaveAsModalOpen(true)}
               aria-label="Save as"
               tooltip="Save as a new local-storage snapshot"
             >
-              <Save size={18} />
+              <Save size={28} />
             </Button>
             <Button
               variant="ghost"
-              className="size-9 p-0"
+              className="size-11 p-0"
               onClick={openLoadModal}
               aria-label="Load"
               tooltip="Load from local storage or JSON file"
             >
-              <FolderOpen size={18} />
+              <FolderOpen size={28} />
             </Button>
             <Button
               variant="ghost"
-              className="size-9 p-0"
+              className="size-11 p-0"
               onClick={undo}
               disabled={!canUndo}
               aria-label="Undo"
             >
-              <Undo2 size={18} />
+              <Undo2 size={28} />
             </Button>
             <Button
               variant="ghost"
-              className="size-9 p-0"
+              className="size-11 p-0"
               onClick={redo}
               disabled={!canRedo}
               aria-label="Redo"
             >
-              <Redo2 size={18} />
+              <Redo2 size={28} />
             </Button>
-            <Button variant="ghost" className="size-9 p-0" onClick={showSettingsPanel} aria-label="Settings">
-              <Settings size={18} />
+            <Button variant="ghost" className="size-11 p-0" onClick={showSettingsPanel} aria-label="Settings">
+              <Settings size={28} />
             </Button>
-            <Button variant="ghost" className="size-9 p-0" onClick={exportActivePlanCsv} aria-label="Export CSV">
-              <FileSpreadsheet size={18} />
+            <Button variant="ghost" className="size-11 p-0" onClick={exportActivePlanCsv} aria-label="Export CSV">
+              <FileSpreadsheet size={28} />
             </Button>
-            <Button variant="ghost" className="size-9 p-0" onClick={exportActivePlanJson} aria-label="Export JSON">
-              <Braces size={18} />
+            <Button variant="ghost" className="size-11 p-0" onClick={exportActivePlanJson} aria-label="Export JSON">
+              <Braces size={28} />
             </Button>
             <span className="mx-1 h-6 w-px bg-line" aria-hidden="true" />
             <Button className="text-xs" onClick={addStarterRows} aria-label="New task" tooltip="New Task">
-              <Plus size={18} />
+              <Plus size={20} />
               Task
             </Button>
             <Button
@@ -218,7 +230,7 @@ export default function PlanView() {
               aria-label="New dependency"
               tooltip="New Dependency"
             >
-              <GitBranchPlus size={18} />
+              <GitBranchPlus size={20} />
               Dependency
             </Button>
             <Button
@@ -228,7 +240,7 @@ export default function PlanView() {
               aria-label="New category"
               tooltip="New Category"
             >
-              <FolderPlus size={18} />
+              <FolderPlus size={20} />
               Category
             </Button>
             <Button
@@ -239,7 +251,7 @@ export default function PlanView() {
               aria-label="Bulk shift selected tasks by weeks"
               tooltip="Bulk shift selected tasks by weeks"
             >
-              <MoveHorizontal size={18} />
+              <MoveHorizontal size={20} />
               Shift
             </Button>
           </div>
@@ -273,6 +285,7 @@ export default function PlanView() {
       <LoadPlanModal
         open={isLoadModalOpen}
         onClose={() => setIsLoadModalOpen(false)}
+        onDeleteSavedPlan={deleteNamedPlan}
         onLoad={loadNamedPlan}
         onLoadJsonFile={loadJsonFile}
         savedPlans={savedPlans}

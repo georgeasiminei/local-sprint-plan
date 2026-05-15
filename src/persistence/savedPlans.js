@@ -42,6 +42,17 @@ export function loadSavedPlan(savedPlanId) {
   };
 }
 
+export function deleteSavedPlan(savedPlanId) {
+  const savedPlans = readSavedPlans();
+  const nextPlans = savedPlans.filter((plan) => plan.id !== savedPlanId);
+
+  if (nextPlans.length === savedPlans.length) {
+    throw new Error('Saved plan was not found.');
+  }
+
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPlans));
+}
+
 function readSavedPlans() {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);

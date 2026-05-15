@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useTimelineStore } from '../../store/index.js';
 import { DEFAULT_ROW_HEIGHT, DEFAULT_WEEK_COLUMN_WIDTH } from '../../constants/defaults.js';
 import Sidebar from '../layout/Sidebar.jsx';
@@ -37,24 +38,20 @@ export default function PlanSettingsPanel({ document }) {
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-sm font-medium">
               Row height
-              <Input
+              <DeferredSettingInput
                 className="mt-1 w-full"
-                type="text"
-                inputMode="numeric"
                 value={document.plan.rowHeight ?? DEFAULT_ROW_HEIGHT}
                 aria-label="Timeline row height in pixels"
-                onChange={(event) => updatePlanSettings({ rowHeight: Number(event.target.value) })}
+                onCommit={(rowHeight) => updatePlanSettings({ rowHeight })}
               />
             </label>
             <label className="block text-sm font-medium">
               Week width
-              <Input
+              <DeferredSettingInput
                 className="mt-1 w-full"
-                type="text"
-                inputMode="numeric"
                 value={document.plan.weekColumnWidth ?? DEFAULT_WEEK_COLUMN_WIDTH}
                 aria-label="Timeline week column width in pixels"
-                onChange={(event) => updatePlanSettings({ weekColumnWidth: Number(event.target.value) })}
+                onCommit={(weekColumnWidth) => updatePlanSettings({ weekColumnWidth })}
               />
             </label>
           </div>
@@ -69,5 +66,49 @@ export default function PlanSettingsPanel({ document }) {
         </p>
       </div>
     </Sidebar>
+  );
+}
+
+function DeferredSettingInput({ value, onCommit, ...props }) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  function commit() {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      setDraft(String(value));
+      return;
+    }
+
+    const nextValue = Number(trimmed);
+    if (!Number.isFinite(nextValue)) {
+      setDraft(String(value));
+      return;
+    }
+
+    onCommit(nextValue);
+  }
+
+  return (
+    <Input
+      {...props}
+      type="text"
+      inputMode="numeric"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
+        }
+        if (event.key === 'Escape') {
+          setDraft(String(value));
+          event.currentTarget.blur();
+        }
+      }}
+    />
   );
 }
