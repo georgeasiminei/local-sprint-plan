@@ -33,9 +33,10 @@ export default function ExternalDependencyNotes({ document, weekColumnWidth }) {
               <button
                 key={box.key}
                 type="button"
-                className={`absolute whitespace-pre-line break-words rounded border px-2 py-1.5 text-[11px] shadow-panel transition hover:brightness-95 ${
+                className={`app-tooltip absolute whitespace-pre-line break-words rounded border px-2 py-1.5 text-[11px] shadow-panel transition hover:brightness-95 ${
                   box.className
                 } ${box.side === 'left' ? 'right-2 text-right' : 'left-2 text-left'}`}
+                data-tooltip="Open external dependency"
                 style={{ top: `${12 + box.stack * 46}px`, width: box.width }}
                 onClick={() => selectExternalDependency(box.id)}
               >

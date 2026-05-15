@@ -65,8 +65,8 @@ describe('URL-owned app state', () => {
 
     expect(window.location.hash).toBe('');
 
-    await user.click(screen.getByRole('button', { name: 'Category' }));
-    await user.click(screen.getByRole('button', { name: 'Task' }));
+    await user.click(screen.getByRole('button', { name: 'New category' }));
+    await user.click(screen.getByRole('button', { name: 'New task' }));
 
     await waitFor(() => expect(window.location.hash).toMatch(/^#(j|b|d)\./));
     const writtenHash = window.location.hash;
@@ -77,6 +77,45 @@ describe('URL-owned app state', () => {
 
     expect(await screen.findByText('Task 1')).toBeInTheDocument();
     expect(window.location.hash).toBe(writtenHash);
+  });
+
+  it('adds fast tooltip labels to visible buttons', async () => {
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    for (const button of screen.getAllByRole('button')) {
+      expect(button, button.outerHTML).toHaveAttribute('data-tooltip');
+    }
+  });
+
+  it('undoes and redoes changes through session-only toolbar history', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    const undoButton = screen.getByRole('button', { name: 'Undo' });
+    const redoButton = screen.getByRole('button', { name: 'Redo' });
+    expect(undoButton).toBeDisabled();
+    expect(redoButton).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'New task' }));
+    expect(await screen.findByText('Task 1')).toBeInTheDocument();
+    expect(undoButton).toBeEnabled();
+
+    await user.click(undoButton);
+    expect(screen.queryByText('Task 1')).not.toBeInTheDocument();
+    expect(redoButton).toBeEnabled();
+
+    await user.click(redoButton);
+    expect(await screen.findByText('Task 1')).toBeInTheDocument();
+
+    await waitFor(async () => {
+      const decoded = await decodePlanFromHashPayload(window.location.hash.slice(1));
+      expect(decoded.tasks).toHaveLength(1);
+      expect(decoded).not.toHaveProperty('undoStack');
+      expect(decoded).not.toHaveProperty('redoStack');
+    });
   });
 
   it('opens an item panel from the grid and closes it with the panel x', async () => {
@@ -133,7 +172,7 @@ describe('URL-owned app state', () => {
     render(<App />);
     await screen.findByText('Nothing is sent to a server, all data stays in this computer');
 
-    await user.click(screen.getByRole('button', { name: 'Dependency' }));
+    await user.click(screen.getByRole('button', { name: 'New dependency' }));
 
     expect(await screen.findByText('Add dependency')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'External' })).toBeInTheDocument();
@@ -352,7 +391,7 @@ describe('URL-owned app state', () => {
       store.selectCategory(document.categories[0].id);
     });
 
-    await user.click(screen.getByRole('button', { name: 'Task' }));
+    await user.click(screen.getByRole('button', { name: 'New task' }));
 
     const document = useTimelineStore.getState().getActiveDocument();
     expect(document.tasks[0]).toMatchObject({
@@ -388,19 +427,33 @@ describe('URL-owned app state', () => {
     expect(await screen.findByText('Locally saved task')).toBeInTheDocument();
   });
 
+  it('loads compact JSON files from the load dialog', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    await user.click(screen.getByRole('button', { name: 'Load' }));
+    const file = new File(['[[],[],[[null,\"Imported JSON\"]]]'], 'plan.json', { type: 'application/json' });
+    const input = document.querySelector('input[type="file"]');
+    await user.upload(input, file);
+
+    expect(await screen.findByText('Imported JSON')).toBeInTheDocument();
+  });
+
   it('selects starter names when creating tasks and categories', async () => {
     const user = userEvent.setup();
 
     render(<App />);
     await screen.findByText('Nothing is sent to a server, all data stays in this computer');
 
-    await user.click(screen.getByRole('button', { name: 'Category' }));
+    await user.click(screen.getByRole('button', { name: 'New category' }));
     const categoryName = await screen.findByDisplayValue('New category');
     expect(categoryName).toHaveFocus();
     expect(categoryName.selectionStart).toBe(0);
     expect(categoryName.selectionEnd).toBe('New category'.length);
 
-    await user.click(screen.getByRole('button', { name: 'Task' }));
+    await user.click(screen.getByRole('button', { name: 'New task' }));
     const taskName = await screen.findByDisplayValue('Task 1');
     expect(taskName).toHaveFocus();
     expect(taskName.selectionStart).toBe(0);
@@ -457,6 +510,25 @@ describe('URL-owned app state', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(useTimelineStore.getState().getActiveDocument().tasks).toHaveLength(1);
+  });
+
+  it('deletes a task without a past warning when it has no past allocation', async () => {
+    const user = userEvent.setup();
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { name: 'No past impact plan', startYear: 2020, startWeek: 1 },
+        tasks: [{ id: 'task-1', name: 'Future-only task', priority: 1, estimateWeeks: 0 }],
+      }),
+    );
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+
+    await user.click(await screen.findByText('Future-only task'));
+    await user.keyboard('{Delete}');
+
+    expect(screen.queryByText('Edit past week?')).not.toBeInTheDocument();
+    expect(useTimelineStore.getState().getActiveDocument().tasks).toHaveLength(0);
   });
 
   it('shows the today marker for the current ISO week', async () => {

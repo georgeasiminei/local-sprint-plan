@@ -284,7 +284,8 @@ function DependencyLists({ document }) {
         <button
           key={dependency.id}
           type="button"
-          className="w-full rounded border border-line px-3 py-2 text-left text-xs hover:bg-panel"
+          className="app-tooltip w-full rounded border border-line px-3 py-2 text-left text-xs hover:bg-panel"
+          data-tooltip="Open internal dependency"
           onClick={() => selectDependency(dependency.id)}
         >
           <span className="font-medium">{taskById.get(dependency.successorId)?.name ?? 'Missing task'}</span>
@@ -295,7 +296,8 @@ function DependencyLists({ document }) {
         <button
           key={dependency.id}
           type="button"
-          className="w-full rounded border border-line px-3 py-2 text-left text-xs hover:bg-panel"
+          className="app-tooltip w-full rounded border border-line px-3 py-2 text-left text-xs hover:bg-panel"
+          data-tooltip="Open external dependency"
           onClick={() => selectExternalDependency(dependency.id)}
         >
           <span className="font-medium">{dependency.name}</span>

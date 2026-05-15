@@ -41,7 +41,8 @@ export default function CategoryTaskGroup({ category, isSynthetic = false, rowHe
         <div className="flex h-full min-h-0 flex-col gap-0.5 overflow-hidden">
           <button
             type="button"
-            className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-white/70"
+            className="app-tooltip flex min-w-0 items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-white/70"
+            data-tooltip={category.collapsed ? 'Expand category' : 'Collapse category'}
             onClick={(event) => {
               event.stopPropagation();
               if (!isSynthetic) {

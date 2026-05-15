@@ -4,6 +4,7 @@ export function buildDependencyGraph(tasks = [], dependencies = []) {
   const outgoing = new Map(tasks.map((task) => [task.id, new Set()]));
 
   for (const dependency of dependencies) {
+    // Legacy aliases are accepted for old hashes; new writes use predecessorId/successorId.
     const predecessorId = dependency.predecessorId ?? dependency.fromTaskId;
     const successorId = dependency.successorId ?? dependency.toTaskId;
 
@@ -36,5 +37,7 @@ export function topologicalSort(tasks = [], dependencies = []) {
   }
 
   const hasCycle = sortedIds.length !== tasks.length;
-  return { sortedIds, hasCycle };
+  const sortedIdSet = new Set(sortedIds);
+  const cycleNodes = hasCycle ? tasks.filter((task) => !sortedIdSet.has(task.id)).map((task) => task.id) : [];
+  return { sortedIds, hasCycle, cycleNodes };
 }

@@ -1,5 +1,13 @@
 export function downloadCsv(filename, csv) {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  downloadText(filename, csv, 'text/csv;charset=utf-8');
+}
+
+export function downloadJson(filename, json) {
+  downloadText(filename, json, 'application/json;charset=utf-8');
+}
+
+function downloadText(filename, text, type) {
+  const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;

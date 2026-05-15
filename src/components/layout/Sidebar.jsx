@@ -9,7 +9,8 @@ export default function Sidebar({ children, onClose, title }) {
           {onClose ? (
             <button
               type="button"
-              className="grid size-7 place-items-center rounded text-slate-500 hover:bg-panel hover:text-ink"
+              className="app-tooltip grid size-7 place-items-center rounded text-slate-500 hover:bg-panel hover:text-ink"
+              data-tooltip="Close panel"
               onClick={onClose}
               aria-label="Close panel"
             >
