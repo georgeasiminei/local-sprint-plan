@@ -15,7 +15,7 @@ permissions:
 # Allow only one concurrent deployment, skipping runs that are superseded
 concurrency:
   group: "pages"
-  cancel-id-id: true
+  cancel-in-progress: true
 
 jobs:
   build:
