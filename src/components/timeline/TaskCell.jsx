@@ -5,6 +5,7 @@ export default function TaskCell({ taskId, taskName, week, rowHeight, allocation
   const [isEditing, setIsEditing] = useState(false);
   const requestWeekEdit = useTimelineStore((state) => state.requestWeekEdit);
   const setTaskResourceFromWeek = useTimelineStore((state) => state.setTaskResourceFromWeek);
+  const selectTask = useTimelineStore((state) => state.selectTask);
 
   function commit(value) {
     setIsEditing(false);
@@ -23,6 +24,9 @@ export default function TaskCell({ taskId, taskName, week, rowHeight, allocation
       style={{ height: rowHeight, lineHeight: `${rowHeight}px`, ...(cellColor ? { backgroundColor: cellColor } : {}) }}
       onClick={(event) => {
         event.stopPropagation();
+        if (taskId) {
+          selectTask(taskId);
+        }
         if (week && !isLocked) {
           setIsEditing(true);
         }
@@ -30,6 +34,9 @@ export default function TaskCell({ taskId, taskName, week, rowHeight, allocation
       onKeyDown={(event) => {
         if ((event.key === 'Enter' || event.key === ' ') && week && !isLocked) {
           event.preventDefault();
+          if (taskId) {
+            selectTask(taskId);
+          }
           setIsEditing(true);
         }
       }}
