@@ -245,7 +245,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 ### 4.3 Shift / Delay Handling
 - **Per-task constraint:** Set `earliestStartWeek` to prevent a task from starting before a given week (drag handle in UI or manual input).
 - **Lag on dependency:** Add `lagWeeks > 0` to insert a buffer between predecessor end and successor start.
-- **Bulk shift:** Select one or more tasks (or an entire category) → shift `earliestStartWeek` by ±N weeks for all selected. Preview diff before applying.
+- **Task shift:** Select a task → shift `earliestStartWeek` by ±N weeks. Preview diff before applying.
 
 ---
 
@@ -254,7 +254,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 ### 5.1 Timeline Grid (main view)
 > The timeline grid has two rendering layers: (1) an HTML table/CSS grid for task rows and data cells, and (2) an SVG overlay perfectly aligned on top of the grid for vertical line markers (dependency lines and today marker). The SVG overlay is position-absolute and pointer-events are set to none on lines so cell interaction is not blocked.
 
-- **Frozen left columns:** Category | Task name | Est (man-weeks) | Calc (computed weeks) stay fixed while week columns scroll horizontally.
+- **Frozen left columns:** Category | Task name | Est (man-weeks) stay fixed while week columns scroll horizontally.
 - **Scrollable week area:** One column per ISO week, grouped under merged two-week sprint header rows. Horizontal scrolling moves week headers, task cells, total cells, and dependency lane content together.
 - The timeline scrolls horizontally as far as generated tasks and external dependency markers require.
 - **Fixed compact cells:** Task rows use a configurable fixed pixel height (`plan.rowHeight`, default 19px) and week columns use a configurable fixed pixel width (`plan.weekColumnWidth`, default 48px). Text is clipped/truncated instead of wrapping so row heights stay consistent. Task-to-task separation uses thin spreadsheet-like borders; category separation remains visually stronger.
@@ -308,8 +308,8 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - Circular dependency detection: warn and block if a cycle would be created
 - Task and category rows expose a compact internal-dependency indicator; clicking it opens the right panel list for that item so internal dependencies can be reviewed and edited after creation
 
-### 5.6 Bulk Shift Modal
-- Trigger: select tasks via checkboxes (or select all in a category) → "Shift" button
+### 5.6 Shift Task Modal
+- Trigger: click a task row to select it → "Shift" button
 - Input: shift by N weeks (positive = delay, negative = accelerate)
 - Preview: shows before/after start week for each affected task
 - Confirm / Cancel
@@ -336,8 +336,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 
 ### 6.1 URL Payload
 - URL format: `https://app/#<payload>`.
-- Payload format is whichever is shortest among the final URL-safe forms `j.<encodeURIComponent(JSON.stringify(compactDocument))>`, `b.<encodeURIComponent(base91(JSON bytes))>`, and `d.<encodeURIComponent(base91(deflate-raw(JSON bytes)))>`.
-- Base91 uses a URL-fragment-safe alphabet that excludes `%` so browser percent-escaping can be decoded without ambiguity.
+- Payload format: `d.<base64url(deflate-raw(JSON bytes))>`.
 - Everything after the first `#` is treated as the payload; no key prefix such as `p=` is used.
 - Store only source data needed to reconstruct the plan: plan settings and plan vacation days, categories and category vacation days, tasks, dependencies, external dependencies, teams, resource overrides, compact completed-task intervals, working-day adjustments, week resources, and manual allocation overrides.
 - The compact document is a positional array schema, not a human-readable object schema. It uses implicit IDs from row order, numeric cross-references, palette indexes for built-in colors, numeric external-dependency status codes, and omitted defaults.

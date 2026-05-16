@@ -38,7 +38,6 @@ export function useKeyboardShortcuts() {
           selectedTaskId: null,
           selectedCategoryId: null,
           selectedExternalDependencyId: null,
-          isSettingsOpen: false,
           isSidebarOpen: false,
         });
       }

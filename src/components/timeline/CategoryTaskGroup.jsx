@@ -22,9 +22,7 @@ export default function CategoryTaskGroup({
   const selectCategory = useTimelineStore((state) => state.selectCategory);
   const selectTask = useTimelineStore((state) => state.selectTask);
   const selectedCategoryId = useTimelineStore((state) => state.selectedCategoryId);
-  const selectedTaskIds = useTimelineStore((state) => state.selectedTaskIds);
   const toggleCategory = useTimelineStore((state) => state.toggleCategory);
-  const toggleTaskSelection = useTimelineStore((state) => state.toggleTaskSelection);
   const isSelected = selectedCategoryId === category.id;
   const visibleTasks = category.collapsed ? [] : tasks;
   const rowCount = Math.max(visibleTasks.length, 1);
@@ -103,9 +101,7 @@ export default function CategoryTaskGroup({
             schedule={schedule}
             rowColor={task.highlightColor ?? category.color}
             weekColumnWidth={weekColumnWidth}
-            selectedTaskIds={selectedTaskIds}
             selectTask={selectTask}
-            toggleTaskSelection={toggleTaskSelection}
           />
         ))
       ) : (
@@ -123,9 +119,7 @@ function TaskGridRow({
   weeks,
   schedule,
   rowColor,
-  selectedTaskIds,
   selectTask,
-  toggleTaskSelection,
   weekColumnWidth,
 }) {
   const selectedTaskId = useTimelineStore((state) => state.selectedTaskId);
@@ -136,7 +130,7 @@ function TaskGridRow({
   return (
     <>
       <div
-        className={`sticky z-[5] grid grid-cols-[30px_1fr_48px_48px] overflow-hidden border-b border-r border-slate-200 bg-white text-left hover:bg-slate-50 ${
+        className={`sticky z-[5] grid grid-cols-[1fr_48px] overflow-hidden border-b border-r border-slate-200 bg-white text-left hover:bg-slate-50 ${
           isSelected ? 'ring-2 ring-focus/40 z-[6]' : ''
         }`}
         style={{
@@ -147,14 +141,6 @@ function TaskGridRow({
         }}
         onClick={() => selectTask(task.id)}
       >
-        <label className="grid place-items-center border-r border-line" onClick={(event) => event.stopPropagation()}>
-          <input
-            type="checkbox"
-            checked={selectedTaskIds.includes(task.id)}
-            onChange={() => toggleTaskSelection(task.id)}
-            aria-label={`Select ${task.name}`}
-          />
-        </label>
         <div className="min-w-0 overflow-hidden px-2">
           <div className="flex min-w-0 items-center gap-1">
             <p
@@ -190,9 +176,6 @@ function TaskGridRow({
         </div>
         <div className="overflow-hidden border-l border-line px-1 text-center text-xs" style={{ lineHeight: `${rowHeight}px` }}>
           {formatNumber(task.estimateWeeks)}
-        </div>
-        <div className="overflow-hidden border-l border-line px-1 text-center text-xs" style={{ lineHeight: `${rowHeight}px` }}>
-          {formatNumber(task.calcWeeks)}
         </div>
       </div>
       <div

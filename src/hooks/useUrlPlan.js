@@ -5,7 +5,6 @@ import {
   compactPlanDocument,
   decodePlanFromHashPayload,
   encodePlanToHashPayload,
-  encodePlanToJsonHashPayload,
 } from '../persistence/shareUrl.js';
 
 export function useUrlPlan() {
@@ -83,18 +82,6 @@ export function useUrlPlan() {
 
     if (!lastPayloadRef.current && isPristineCompactDocument(compactPlanDocument(activeDocument))) {
       setSaveStatus('url ready');
-      return;
-    }
-
-    try {
-      const immediatePayload = encodePlanToJsonHashPayload(activeDocument);
-      if (immediatePayload !== lastPayloadRef.current) {
-        lastPayloadRef.current = immediatePayload;
-        replaceHashPayload(immediatePayload);
-      }
-    } catch (error) {
-      setSaveStatus('url error');
-      setImportError(error.message);
       return;
     }
 

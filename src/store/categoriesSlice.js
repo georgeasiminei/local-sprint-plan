@@ -29,7 +29,6 @@ export function createCategoriesSlice(set, get) {
         selectedExternalDependencyId: null,
         selectedWeekIndex: null,
         activePanel: 'category',
-        isSettingsOpen: false,
         isSidebarOpen: true,
       });
       return id;

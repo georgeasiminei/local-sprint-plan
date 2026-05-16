@@ -17,31 +17,14 @@ const DEFAULT_FREE_DAY_REASON = 'Week capacity adjustment';
 const COLOR_PALETTE = DEFAULT_CATEGORY_COLORS;
 const STATUS_TO_CODE = { partial: 1, yes: 2 };
 const CODE_TO_STATUS = ['no', 'partial', 'yes'];
-// Keep `%` out of the alphabet so browser percent-escaping in URL hashes can be safely decoded.
-const BASE91_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$-&()*+,./:;<=>?@[]^_`{|}~"';
-const BASE91_LOOKUP = new Map([...BASE91_ALPHABET].map((character, index) => [character, index]));
 
 export async function encodePlanToHashPayload(planDocument, options = {}) {
   const maxPayloadLength = options.maxPayloadLength ?? SHARE_URL_MAX_PAYLOAD_LENGTH;
   const compactDocument = compactPlanDocument(planDocument);
   const json = JSON.stringify(compactDocument);
-  const jsonPayload = `j.${encodeURIComponent(json)}`;
-  const base91Payload = `b.${encodeURIComponent(encodeBase91(new TextEncoder().encode(json)))}`;
-  const compressedPayload = `d.${encodeURIComponent(encodeBase91(await compressBytes(new TextEncoder().encode(json))))}`;
-  const payload = [jsonPayload, base91Payload, compressedPayload].sort((a, b) => a.length - b.length)[0];
-
-  if (payload.length > maxPayloadLength) {
-    throw new Error(
-      `URL state is too large (${payload.length.toLocaleString()} characters). Reduce plan size before sharing.`,
-    );
-  }
-
-  return payload;
-}
-
-export function encodePlanToJsonHashPayload(planDocument, options = {}) {
-  const maxPayloadLength = options.maxPayloadLength ?? SHARE_URL_MAX_PAYLOAD_LENGTH;
-  const payload = `j.${encodeURIComponent(JSON.stringify(compactPlanDocument(planDocument)))}`;
+  const jsonBytes = new TextEncoder().encode(json);
+  const compressedBytes = await compressBytes(jsonBytes);
+  const payload = `d.${encodeBase64Url(compressedBytes)}`;
 
   if (payload.length > maxPayloadLength) {
     throw new Error(
@@ -158,28 +141,32 @@ export function expandCompactPlanDocument(compactDocument) {
     collapsed: Boolean(category[3]),
     vacations: expandWeekValuePairs(category[4]).map(({ weekIndex, value }) => ({ weekIndex, dayCount: value })),
   }));
-  const tasks = (compactDocument[2] ?? []).map((task = [], index) => ({
-    id: `t${index + 1}`,
-    categoryId: task[0] === null || task[0] === undefined ? null : `c${task[0] + 1}`,
-    name: task[1] ?? `Task ${index + 1}`,
-    priority: task[2] ?? index + 1,
-    estimateWeeks: task[3] ?? 1,
-    calcWeeks: 0,
-    highlightColor: decodeColor(task[4]),
-    notes: task[5] ?? '',
-    earliestStartWeek: task[6] ?? null,
-    maxResources: task[7] ?? null,
-    resourceOverrides: expandWeekValuePairs(task[8]).map(({ weekIndex, value }) => ({
-      weekIndex,
-      allocatedUnits: value,
-    })),
-    ...(expandCompletedIntervals(task[9]).length > 0
-      ? {
-          completed: true,
-          completedIntervals: expandCompletedIntervals(task[9]),
-        }
-      : {}),
-  }));
+  const tasks = (compactDocument[2] ?? []).map((task = [], index) => {
+    const completedIntervals = expandCompletedIntervals(task[9]);
+
+    return {
+      id: `t${index + 1}`,
+      categoryId: task[0] === null || task[0] === undefined ? null : `c${task[0] + 1}`,
+      name: task[1] ?? `Task ${index + 1}`,
+      priority: task[2] ?? index + 1,
+      estimateWeeks: task[3] ?? 1,
+      calcWeeks: 0,
+      highlightColor: decodeColor(task[4]),
+      notes: task[5] ?? '',
+      earliestStartWeek: task[6] ?? null,
+      maxResources: task[7] ?? null,
+      resourceOverrides: expandWeekValuePairs(task[8]).map(({ weekIndex, value }) => ({
+        weekIndex,
+        allocatedUnits: value,
+      })),
+      ...(completedIntervals.length > 0
+        ? {
+            completed: true,
+            completedIntervals,
+          }
+        : {}),
+    };
+  });
   const dependencies = (compactDocument[3] ?? []).map((dependency = [], index) => {
     const predecessor = decodeDependencyReference(dependency[0]);
     const successor = decodeDependencyReference(dependency[1]);
@@ -264,101 +251,25 @@ export async function decodeCompactPayload(payload) {
     throw new Error('Shared link payload is empty.');
   }
 
-  if (payload.startsWith('j.')) {
-    try {
-      return JSON.parse(decodeURIComponent(payload.slice(2)));
-    } catch (error) {
-      throw new Error(`URL state is not valid JSON. ${error.message}`);
-    }
-  }
-
   if (payload.startsWith('d.')) {
-    return decodeCompressedPayload(decodeHashEscapes(payload.slice(2)));
-  }
-
-  if (payload.startsWith('b.')) {
-    try {
-      return JSON.parse(new TextDecoder().decode(decodeBase91(decodeHashEscapes(payload.slice(2)))));
-    } catch (error) {
-      throw new Error(`URL state is not valid JSON. ${error.message}`);
-    }
+    return decodeCompressedPayload(payload.slice(2));
   }
 
   throw new Error('Shared link payload uses an unsupported URL state format.');
 }
 
-export function encodeBase91(bytes) {
-  let accumulator = 0;
-  let bitCount = 0;
-  let output = '';
-
-  for (const byte of bytes) {
-    accumulator |= byte << bitCount;
-    bitCount += 8;
-
-    if (bitCount > 13) {
-      let value = accumulator & 8191;
-
-      if (value > 88) {
-        accumulator >>= 13;
-        bitCount -= 13;
-      } else {
-        value = accumulator & 16383;
-        accumulator >>= 14;
-        bitCount -= 14;
-      }
-
-      output += BASE91_ALPHABET[value % 91] + BASE91_ALPHABET[Math.floor(value / 91)];
-    }
-  }
-
-  if (bitCount > 0) {
-    output += BASE91_ALPHABET[accumulator % 91];
-
-    if (bitCount > 7 || accumulator > 90) {
-      output += BASE91_ALPHABET[Math.floor(accumulator / 91)];
-    }
-  }
-
-  return output;
+export function encodeBase64Url(bytes) {
+  const base64 = btoa(bytesToBinaryString(bytes));
+  return base64.replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '');
 }
 
-export function decodeBase91(payload) {
-  let pendingValue = -1;
-  let accumulator = 0;
-  let bitCount = 0;
-  const output = [];
-
-  for (const character of payload) {
-    const value = BASE91_LOOKUP.get(character);
-
-    if (value === undefined) {
-      throw new Error(`Unexpected character "${character}".`);
-    }
-
-    if (pendingValue < 0) {
-      pendingValue = value;
-      continue;
-    }
-
-    pendingValue += value * 91;
-    accumulator |= pendingValue << bitCount;
-    bitCount += (pendingValue & 8191) > 88 ? 13 : 14;
-
-    do {
-      output.push(accumulator & 255);
-      accumulator >>= 8;
-      bitCount -= 8;
-    } while (bitCount > 7);
-
-    pendingValue = -1;
+export function decodeBase64Url(payload) {
+  if (!/^[A-Za-z0-9_-]*$/u.test(payload)) {
+    throw new Error('Unexpected character in Base64url payload.');
   }
 
-  if (pendingValue >= 0) {
-    output.push((accumulator | (pendingValue << bitCount)) & 255);
-  }
-
-  return new Uint8Array(output);
+  const paddedPayload = payload.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(payload.length / 4) * 4, '=');
+  return binaryStringToBytes(atob(paddedPayload));
 }
 
 function compactPlan(plan, { firstWeekIndex, sprintStartNumber, sprintStartOrder, startYear }) {
@@ -482,9 +393,9 @@ async function decodeCompressedPayload(payload) {
   let compressed;
 
   try {
-    compressed = decodeBase91(payload);
+    compressed = decodeBase64Url(payload);
   } catch (error) {
-    throw new Error(`URL state contains invalid Base91 data. ${error.message}`);
+    throw new Error(`URL state contains invalid Base64url data. ${error.message}`);
   }
 
   let bytes;
@@ -499,14 +410,6 @@ async function decodeCompressedPayload(payload) {
     return JSON.parse(new TextDecoder().decode(bytes));
   } catch (error) {
     throw new Error(`URL state is not valid JSON. ${error.message}`);
-  }
-}
-
-function decodeHashEscapes(payload) {
-  try {
-    return decodeURIComponent(payload);
-  } catch {
-    return payload;
   }
 }
 
@@ -535,4 +438,18 @@ function bytesToStream(bytes) {
       controller.close();
     },
   });
+}
+
+function bytesToBinaryString(bytes) {
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return binary;
+}
+
+function binaryStringToBytes(binary) {
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }

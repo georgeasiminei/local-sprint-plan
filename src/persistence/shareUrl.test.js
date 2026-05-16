@@ -4,9 +4,9 @@ import { createPlanFixture } from '../test/fixtures/planDocument.js';
 import { validatePlanDocument } from '../utils/validators.js';
 import {
   compactPlanDocument,
-  decodeBase91,
+  decodeBase64Url,
   decodePlanFromHashPayload,
-  encodeBase91,
+  encodeBase64Url,
   encodePlanToHashPayload,
   expandCompactPlanDocument,
 } from './shareUrl.js';
@@ -126,7 +126,7 @@ describe('URL plan payloads', () => {
     });
   });
 
-  it('chooses the shortest available URL-safe encoding', async () => {
+  it('always emits compressed URL-safe payloads', async () => {
     const smallDocument = createPlanFixture({
       plan: { name: 'Tiny' },
       teams: [{ id: 'team1', name: 'Team 1' }],
@@ -144,7 +144,27 @@ describe('URL plan payloads', () => {
 
     const smallPayload = await encodePlanToHashPayload(smallDocument);
     await expect(encodePlanToHashPayload(largeDocument)).resolves.toMatch(/^d\./);
+    expect(smallPayload).toMatch(/^d\./);
     expect(smallPayload.length).toBeLessThan(30);
+  });
+
+  it('uses a browser-clean compressed payload for larger plans', async () => {
+    const document = createPlanFixture({
+      tasks: Array.from({ length: 60 }, (_, index) => ({
+        id: `task-${index + 1}`,
+        name: `Task ${index + 1} with repeated planning text`,
+        priority: index + 1,
+        estimateWeeks: 2,
+        notes: 'Repeated notes make compression worthwhile. '.repeat(4),
+      })),
+    });
+
+    const payload = await encodePlanToHashPayload(document);
+
+    expect(payload).toMatch(/^d\.[A-Za-z0-9_-]+$/);
+    await expect(decodePlanFromHashPayload(payload)).resolves.toMatchObject({
+      tasks: expect.arrayContaining([expect.objectContaining({ name: 'Task 1 with repeated planning text' })]),
+    });
   });
 
   it('decodes a payload back into a runtime plan', async () => {
@@ -255,28 +275,30 @@ describe('URL plan payloads', () => {
     await expect(encodePlanToHashPayload(document, { maxPayloadLength: 1 })).rejects.toThrow('URL state is too large');
   });
 
-  it('rejects invalid Base91 data', async () => {
-    await expect(decodePlanFromHashPayload('d. ')).rejects.toThrow('invalid Base91 data');
+  it('rejects invalid Base64url data', async () => {
+    await expect(decodePlanFromHashPayload('d.*')).rejects.toThrow('invalid Base64url data');
   });
 
   it('rejects invalid compressed bytes', async () => {
-    const payload = `d.${encodeBase91(new Uint8Array([1, 2, 3, 4]))}`;
+    const payload = `d.${encodeBase64Url(new Uint8Array([1, 2, 3, 4]))}`;
 
     await expect(decodePlanFromHashPayload(payload)).rejects.toThrow('could not be decompressed');
   });
 
   it('rejects decompressed payloads that are not JSON', async () => {
-    const payload = `d.${encodeBase91(await compressText('not json'))}`;
+    const payload = `d.${encodeBase64Url(await compressText('not json'))}`;
 
     await expect(decodePlanFromHashPayload(payload)).rejects.toThrow('not valid JSON');
   });
 });
 
-describe('Base91 byte encoding', () => {
-  it('round trips arbitrary bytes', () => {
+describe('Base64url byte encoding', () => {
+  it('round trips arbitrary bytes without reserved URL characters', () => {
     const bytes = new Uint8Array([0, 1, 2, 3, 13, 90, 127, 128, 200, 255]);
+    const payload = encodeBase64Url(bytes);
 
-    expect(decodeBase91(encodeBase91(bytes))).toEqual(bytes);
+    expect(payload).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(decodeBase64Url(payload)).toEqual(bytes);
   });
 });
 

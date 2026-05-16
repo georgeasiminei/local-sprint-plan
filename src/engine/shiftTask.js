@@ -1,8 +1,6 @@
-export function shiftTasks(tasks = [], taskIds = [], weekDelta = 0, fallbackStartWeek = 1) {
-  const selected = new Set(taskIds);
-
+export function shiftTask(tasks = [], taskId, weekDelta = 0, fallbackStartWeek = 1) {
   return tasks.map((task) => {
-    if (!selected.has(task.id)) {
+    if (task.id !== taskId) {
       return task;
     }
 

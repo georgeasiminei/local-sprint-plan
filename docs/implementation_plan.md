@@ -37,7 +37,7 @@ Build a local-only React planning app whose single active plan is owned by the b
 
 - URL state uses a positional array schema with implicit IDs, numeric cross-references, palette-index colors, numeric dependency statuses, and omitted defaults.
 - Plan vacation days, categories, category vacation days, tasks, dependencies, external dependencies, teams, working-day adjustments, week resources, and manual/resource overrides are preserved as source data.
-- Payload selection chooses the shortest final URL-fragment form among `j.` URI-escaped JSON, `b.` escaped Base91 JSON bytes, and `d.` escaped Base91 deflate-raw bytes.
+- URL payloads use a single `d.` base64url deflate-raw format.
 
 ## Verification
 
