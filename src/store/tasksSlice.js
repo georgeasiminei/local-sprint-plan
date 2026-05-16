@@ -1,5 +1,5 @@
 import { createId } from '../utils/uuid.js';
-import { shiftTasks } from '../engine/shiftTasks.js';
+import { shiftTask } from '../engine/shiftTask.js';
 import {
   clearTaskCompletion,
   freezeTaskFromSchedule,
@@ -39,7 +39,6 @@ export function createTasksSlice(set, get) {
         selectedExternalDependencyId: null,
         selectedWeekIndex: null,
         activePanel: 'task',
-        isSettingsOpen: false,
         isSidebarOpen: true,
       });
       return id;
@@ -81,10 +80,10 @@ export function createTasksSlice(set, get) {
           ),
         schedule: (schedule) => schedule.filter((item) => item.taskId !== taskId),
       }),
-    bulkShiftTasks: (taskIds, weekDelta) =>
+    shiftTask: (taskId, weekDelta) =>
       get().updateActiveDocument((document) => ({
         ...document,
-        tasks: shiftTasks(document.tasks, taskIds, Number(weekDelta) || 0, document.plan.startWeek ?? 1),
+        tasks: shiftTask(document.tasks, taskId, Number(weekDelta) || 0, document.plan.startWeek ?? 1),
       })),
   };
 }

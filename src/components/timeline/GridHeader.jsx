@@ -25,11 +25,9 @@ export default function GridHeader({ weeks = [], sprints = [], weekColumnWidth }
         className="sticky z-[11] border-r border-line bg-slate-50 px-2 py-1.5 text-[10px] font-semibold uppercase text-slate-500"
         style={{ left: CATEGORY_COLUMN_WIDTH }}
       >
-        <div className="grid grid-cols-[30px_1fr_48px_48px]">
-          <span />
+        <div className="grid grid-cols-[1fr_48px]">
           <span>Task</span>
           <span className="text-center">Est</span>
-          <span className="text-center">Calc</span>
         </div>
       </div>
       <div className="col-start-3">

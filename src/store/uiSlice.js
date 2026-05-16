@@ -7,10 +7,8 @@ export function createUiSlice(set, get) {
     selectedDependencyId: null,
     selectedExternalDependencyId: null,
     selectedWeekIndex: null,
-    selectedTaskIds: [],
     activePanel: 'task',
-    isSettingsOpen: false,
-    isBulkShiftOpen: false,
+    isShiftTaskOpen: false,
     isSidebarOpen: false,
     pendingPastWeekEdit: null,
     undoStack: [],
@@ -23,7 +21,6 @@ export function createUiSlice(set, get) {
         selectedExternalDependencyId: null,
         selectedWeekIndex: null,
         activePanel: 'task',
-        isSettingsOpen: false,
         isSidebarOpen: true,
       }),
     selectCategory: (categoryId) =>
@@ -34,7 +31,6 @@ export function createUiSlice(set, get) {
         selectedExternalDependencyId: null,
         selectedWeekIndex: null,
         activePanel: 'category',
-        isSettingsOpen: false,
         isSidebarOpen: true,
       }),
     selectDependency: (dependencyId) =>
@@ -45,7 +41,6 @@ export function createUiSlice(set, get) {
         selectedCategoryId: null,
         selectedWeekIndex: null,
         activePanel: 'dependency',
-        isSettingsOpen: false,
         isSidebarOpen: true,
       }),
     selectExternalDependency: (dependencyId) =>
@@ -56,19 +51,9 @@ export function createUiSlice(set, get) {
         selectedCategoryId: null,
         selectedWeekIndex: null,
         activePanel: 'dependency',
-        isSettingsOpen: false,
         isSidebarOpen: true,
       }),
-    toggleTaskSelection: (taskId) =>
-      set((state) => ({
-        selectedTaskIds: state.selectedTaskIds.includes(taskId)
-          ? state.selectedTaskIds.filter((id) => id !== taskId)
-          : [...state.selectedTaskIds, taskId],
-      })),
-    clearTaskSelection: () => set({ selectedTaskIds: [] }),
-    toggleSettings: () => set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
-    showSettingsPanel: () => set({ activePanel: 'settings', isSettingsOpen: true, isSidebarOpen: true }),
-    showTaskPanel: () => set({ activePanel: 'task', isSettingsOpen: false, isSidebarOpen: true }),
+    showSettingsPanel: () => set({ activePanel: 'settings', isSidebarOpen: true }),
     selectWeek: (weekIndex) =>
       set({
         selectedWeekIndex: weekIndex,
@@ -77,23 +62,20 @@ export function createUiSlice(set, get) {
         selectedDependencyId: null,
         selectedExternalDependencyId: null,
         activePanel: 'week',
-        isSettingsOpen: false,
         isSidebarOpen: true,
       }),
     showDependencyPanel: () =>
       set({
         activePanel: 'dependency',
-        isSettingsOpen: false,
         isSidebarOpen: true,
         selectedDependencyId: null,
         selectedExternalDependencyId: null,
         selectedTaskId: null,
         selectedCategoryId: null,
       }),
-    openBulkShift: () => set({ isBulkShiftOpen: true }),
-    closeBulkShift: () => set({ isBulkShiftOpen: false }),
-    toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
-    closeSidebar: () => set({ isSidebarOpen: false, isSettingsOpen: false }),
+    openShiftTask: () => set({ isShiftTaskOpen: true }),
+    closeShiftTask: () => set({ isShiftTaskOpen: false }),
+    closeSidebar: () => set({ isSidebarOpen: false }),
     deleteTaskWithGuard: (taskId) => {
       const document = get().getActiveDocument();
       const week = findPastWeekForTask(document, taskId);
@@ -101,7 +83,6 @@ export function createUiSlice(set, get) {
         get().removeTask(taskId);
         set((state) => ({
           selectedTaskId: state.selectedTaskId === taskId ? null : state.selectedTaskId,
-          selectedTaskIds: state.selectedTaskIds.filter((id) => id !== taskId),
           isSidebarOpen: state.selectedTaskId === taskId ? false : state.isSidebarOpen,
         }));
       };

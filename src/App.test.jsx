@@ -48,7 +48,7 @@ describe('URL-owned app state', () => {
 
     await waitFor(
       async () => {
-        expect(window.location.hash).toMatch(/^#(j|b|d)\./);
+        expect(window.location.hash).toMatch(/^#d\./);
         expect(window.localStorage.length).toBe(0);
         const decoded = await decodePlanFromHashPayload(window.location.hash.slice(1));
         expect(decoded.tasks.some((task) => task.name === 'URL task')).toBe(true);
@@ -67,30 +67,8 @@ describe('URL-owned app state', () => {
 
     await user.click(screen.getByRole('button', { name: 'New category' }));
 
-    await waitFor(() => expect(window.location.hash).toMatch(/^#(j|b|d)\./));
+    await waitFor(() => expect(window.location.hash).toMatch(/^#d\./));
     const writtenHash = window.location.hash;
-
-    cleanup();
-    resetStore();
-    render(<App />);
-
-    await waitFor(() => {
-      expect(useTimelineStore.getState().getActiveDocument().categories).toEqual([
-        expect.objectContaining({ name: 'New category' }),
-      ]);
-    });
-    expect(window.location.hash).toBe(writtenHash);
-  });
-
-  it('writes a refresh-safe hash immediately after meaningful edits', async () => {
-    const user = userEvent.setup();
-
-    render(<App />);
-    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
-
-    await user.click(screen.getByRole('button', { name: 'New category' }));
-    const writtenHash = window.location.hash;
-    expect(writtenHash).toMatch(/^#j\./);
 
     cleanup();
     resetStore();
@@ -117,8 +95,8 @@ describe('URL-owned app state', () => {
     render(<App />);
     await screen.findByText('Nothing is sent to a server, all data stays in this computer');
 
-    const link = screen.getByRole('link', { name: 'zupermann/local-sprint-plan' });
-    expect(link).toHaveAttribute('href', 'https://github.com/zupermann/local-sprint-plan');
+    const link = screen.getByRole('link', { name: 'georgeasiminei/local-sprint-plan' });
+    expect(link).toHaveAttribute('href', 'https://github.com/georgeasiminei/local-sprint-plan');
   });
 
   it('undoes and redoes changes through session-only toolbar history', async () => {
@@ -149,6 +127,29 @@ describe('URL-owned app state', () => {
       expect(decoded).not.toHaveProperty('undoStack');
       expect(decoded).not.toHaveProperty('redoStack');
     });
+  });
+
+  it('uses clicked task selection for shift without row checkboxes', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    const shiftButton = screen.getByRole('button', { name: 'Shift selected task by weeks' });
+    expect(shiftButton).toBeDisabled();
+
+    act(() => {
+      useTimelineStore.getState().addTask({ name: 'Shift me' });
+    });
+
+    expect(screen.queryByRole('checkbox', { name: 'Select Shift me' })).not.toBeInTheDocument();
+    await user.click(await screen.findByText('Shift me'));
+    expect(shiftButton).toBeEnabled();
+
+    await user.click(shiftButton);
+    expect(await screen.findByText('Shift task')).toBeInTheDocument();
+    expect(screen.getAllByText('Shift me')).toHaveLength(2);
+    expect(screen.queryByText(/Select a task in the timeline first\./i)).not.toBeInTheDocument();
   });
 
   it('lets settings dimensions be cleared and typed before committing', async () => {
@@ -934,9 +935,7 @@ function resetStore() {
     selectedTaskId: null,
     selectedCategoryId: null,
     selectedDependencyId: null,
-    selectedTaskIds: [],
-    isBulkShiftOpen: false,
-    isSettingsOpen: false,
+    isShiftTaskOpen: false,
     isSidebarOpen: false,
     activePanel: 'task',
     selectedExternalDependencyId: null,

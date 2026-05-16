@@ -60,7 +60,6 @@ export function createDependenciesSlice(set, get) {
         selectedCategoryId: null,
         selectedWeekIndex: null,
         activePanel: 'dependency',
-        isSettingsOpen: false,
         isSidebarOpen: true,
       });
       return id;
@@ -127,7 +126,6 @@ export function createDependenciesSlice(set, get) {
         selectedCategoryId: null,
         selectedWeekIndex: null,
         activePanel: 'dependency',
-        isSettingsOpen: false,
         isSidebarOpen: true,
       });
       return id;

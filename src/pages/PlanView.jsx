@@ -20,7 +20,7 @@ import { downloadCsv, downloadJson, exportScheduleCsv } from '../persistence/exp
 import { compactPlanDocument, expandCompactPlanDocument } from '../persistence/shareUrl.js';
 import Button from '../components/ui/Button.jsx';
 import TimelineGrid from '../components/timeline/TimelineGrid.jsx';
-import BulkShiftModal from '../components/panels/BulkShiftModal.jsx';
+import ShiftTaskModal from '../components/panels/ShiftTaskModal.jsx';
 import CategoryDetailPanel from '../components/panels/CategoryDetailPanel.jsx';
 import DependencyDetailPanel from '../components/panels/DependencyDetailPanel.jsx';
 import TaskDetailPanel from '../components/panels/TaskDetailPanel.jsx';
@@ -50,17 +50,16 @@ export default function PlanView() {
   const addCategory = useTimelineStore((state) => state.addCategory);
   const addTask = useTimelineStore((state) => state.addTask);
   const activePanel = useTimelineStore((state) => state.activePanel);
-  const closeBulkShift = useTimelineStore((state) => state.closeBulkShift);
+  const closeShiftTask = useTimelineStore((state) => state.closeShiftTask);
   const importError = useTimelineStore((state) => state.importError);
-  const isBulkShiftOpen = useTimelineStore((state) => state.isBulkShiftOpen);
+  const isShiftTaskOpen = useTimelineStore((state) => state.isShiftTaskOpen);
   const isSidebarOpen = useTimelineStore((state) => state.isSidebarOpen);
-  const openBulkShift = useTimelineStore((state) => state.openBulkShift);
+  const openShiftTask = useTimelineStore((state) => state.openShiftTask);
   const saveStatus = useTimelineStore((state) => state.saveStatus);
   const savedPlanId = useTimelineStore((state) => state.savedPlanId);
   const savedPlanName = useTimelineStore((state) => state.savedPlanName);
   const selectedCategoryId = useTimelineStore((state) => state.selectedCategoryId);
   const selectedTaskId = useTimelineStore((state) => state.selectedTaskId);
-  const selectedTaskIds = useTimelineStore((state) => state.selectedTaskIds);
   const showDependencyPanel = useTimelineStore((state) => state.showDependencyPanel);
   const showSettingsPanel = useTimelineStore((state) => state.showSettingsPanel);
   const hydratePlan = useTimelineStore((state) => state.hydratePlan);
@@ -293,10 +292,10 @@ export default function PlanView() {
             <Button
               variant="secondary"
               className="text-xs"
-              onClick={openBulkShift}
-              disabled={selectedTaskIds.length === 0}
-              aria-label="Bulk shift selected tasks by weeks"
-              tooltip="Bulk shift selected tasks by weeks"
+              onClick={openShiftTask}
+              disabled={!selectedTaskId}
+              aria-label="Shift selected task by weeks"
+              tooltip="Shift selected task by weeks"
             >
               <MoveHorizontal size={20} />
               Shift
@@ -314,7 +313,7 @@ export default function PlanView() {
           {activePanel === 'week' ? <WeekDetailPanel document={document} /> : null}
         </div>
       ) : null}
-      <BulkShiftModal document={document} open={isBulkShiftOpen} onClose={closeBulkShift} />
+      <ShiftTaskModal document={document} open={isShiftTaskOpen} onClose={closeShiftTask} />
       <PastWeekEditModal />
       <SavePlanModal
         initialName={savedPlanName ?? document.plan.name}
