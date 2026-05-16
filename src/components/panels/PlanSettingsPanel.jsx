@@ -59,6 +59,14 @@ export default function PlanSettingsPanel({ document }) {
             <Badge>{document.weeks.length} calculated weeks</Badge>
             <Badge>{document.sprints.length} sprints</Badge>
           </div>
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={document.plan.showInternalDependencyLines !== false}
+              onChange={(event) => updatePlanSettings({ showInternalDependencyLines: event.target.checked })}
+            />
+            Show internal dependency lines
+          </label>
         </section>
 
         <p className="text-sm text-slate-500">

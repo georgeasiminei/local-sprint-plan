@@ -20,6 +20,7 @@ export function createPlanSlice(set, get) {
         saveStatus: 'url updated',
         importError: null,
         hasHydrated: true,
+        hasAppliedAutoCompletion: false,
         savedPlanId: options.savedPlanId ?? null,
         savedPlanName: options.savedPlanName ?? null,
       });
@@ -32,6 +33,7 @@ export function createPlanSlice(set, get) {
         activePlanId: document.plan.id,
         plans: [document],
         saveStatus: 'unsaved',
+        hasAppliedAutoCompletion: false,
         savedPlanId: null,
         savedPlanName: null,
       }));
@@ -147,6 +149,11 @@ export function createPlanSlice(set, get) {
                   resourceOverrides: (task.resourceOverrides ?? []).map((override) => ({
                     ...override,
                     weekIndex: Math.max(1, override.weekIndex + startWeekDelta),
+                  })),
+                  completedIntervals: (task.completedIntervals ?? []).map((interval) => ({
+                    ...interval,
+                    startWeek: Math.max(1, interval.startWeek + startWeekDelta),
+                    endWeek: Math.max(1, (interval.endWeek ?? interval.startWeek) + startWeekDelta),
                   })),
                 })),
           externalDependencies:

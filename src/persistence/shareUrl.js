@@ -98,12 +98,13 @@ export function compactPlanDocument(document) {
         task.earliestStartWeek ?? null,
         task.maxResources ?? null,
         compactRows(task.resourceOverrides, (override) => [override.weekIndex, override.allocatedUnits]),
+        compactCompletedIntervals(task.completedIntervals),
       ]),
     ),
     compactRows(document.dependencies, (dependency) =>
       trimArray([
-        taskIndex.get(dependency.predecessorId),
-        taskIndex.get(dependency.successorId),
+        encodeDependencyReference(dependency.predecessorType ?? 'task', dependency.predecessorId, taskIndex, categoryIndex),
+        encodeDependencyReference(dependency.successorType ?? 'task', dependency.successorId, taskIndex, categoryIndex),
         dependency.lagWeeks || null,
       ]),
     ),
@@ -172,13 +173,26 @@ export function expandCompactPlanDocument(compactDocument) {
       weekIndex,
       allocatedUnits: value,
     })),
+    ...(expandCompletedIntervals(task[9]).length > 0
+      ? {
+          completed: true,
+          completedIntervals: expandCompletedIntervals(task[9]),
+        }
+      : {}),
   }));
-  const dependencies = (compactDocument[3] ?? []).map((dependency = [], index) => ({
-    id: `d${index + 1}`,
-    predecessorId: `t${dependency[0] + 1}`,
-    successorId: `t${dependency[1] + 1}`,
-    lagWeeks: dependency[2] ?? 0,
-  }));
+  const dependencies = (compactDocument[3] ?? []).map((dependency = [], index) => {
+    const predecessor = decodeDependencyReference(dependency[0]);
+    const successor = decodeDependencyReference(dependency[1]);
+
+    return {
+      id: `d${index + 1}`,
+      predecessorType: predecessor.type,
+      predecessorId: predecessor.id,
+      successorType: successor.type,
+      successorId: successor.id,
+      lagWeeks: dependency[2] ?? 0,
+    };
+  });
   const externalDependencies = (compactDocument[4] ?? []).map((dependency = [], index) => ({
     id: `x${index + 1}`,
     name: dependency[0] ?? `External dependency ${index + 1}`,
@@ -223,6 +237,7 @@ export function expandCompactPlanDocument(compactDocument) {
       rowHeight: planRow[7] ?? DEFAULT_ROW_HEIGHT,
       vacations: expandWeekValuePairs(planRow[8]).map(({ weekIndex, value }) => ({ weekIndex, dayCount: value })),
       weekColumnWidth: planRow[9] ?? DEFAULT_WEEK_COLUMN_WIDTH,
+      showInternalDependencyLines: planRow[10] !== 0,
       createdAt: now,
       updatedAt: now,
     },
@@ -358,6 +373,7 @@ function compactPlan(plan, { firstWeekIndex, sprintStartNumber, sprintStartOrder
     plan?.rowHeight && plan.rowHeight !== DEFAULT_ROW_HEIGHT ? plan.rowHeight : null,
     compactRows(plan?.vacations, (vacation) => [vacation.weekIndex, vacation.dayCount]),
     plan?.weekColumnWidth && plan.weekColumnWidth !== DEFAULT_WEEK_COLUMN_WIDTH ? plan.weekColumnWidth : null,
+    plan?.showInternalDependencyLines === false ? 0 : null,
   ]);
 }
 
@@ -401,11 +417,52 @@ function decodeColor(value) {
   return value ?? null;
 }
 
+function encodeDependencyReference(type, id, taskIndex, categoryIndex) {
+  if (type === 'category') {
+    const index = categoryIndex.get(id);
+    return index === undefined ? null : -(index + 1);
+  }
+
+  return taskIndex.get(id);
+}
+
+function decodeDependencyReference(value) {
+  if (typeof value === 'number' && value < 0) {
+    return { type: 'category', id: `c${Math.abs(value)}` };
+  }
+
+  return { type: 'task', id: `t${(value ?? 0) + 1}` };
+}
+
 function expandWeekValuePairs(rows = []) {
-  return rows.map((row = []) => ({
+  return (rows ?? []).map((row = []) => ({
     weekIndex: row[0],
     value: row[1] ?? 0,
   }));
+}
+
+function compactCompletedIntervals(intervals = []) {
+  return compactRows(intervals, (interval) =>
+    interval.startWeek === (interval.endWeek ?? interval.startWeek)
+      ? [interval.startWeek, interval.allocatedUnits]
+      : [interval.startWeek, interval.endWeek, interval.allocatedUnits],
+  );
+}
+
+function expandCompletedIntervals(rows = []) {
+  return (rows ?? []).map((row = []) =>
+    row.length <= 2
+      ? {
+          startWeek: row[0],
+          endWeek: row[0],
+          allocatedUnits: row[1] ?? 0,
+        }
+      : {
+          startWeek: row[0],
+          endWeek: row[1] ?? row[0],
+          allocatedUnits: row[2] ?? 0,
+        },
+  );
 }
 
 function compactRows(items = [], mapper) {

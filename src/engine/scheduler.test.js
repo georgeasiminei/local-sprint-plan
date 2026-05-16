@@ -204,6 +204,69 @@ describe('recalculateSchedule', () => {
     expect(result.weeks.at(-1).weekIndex).toBe(14);
   });
 
+  it('waits for all predecessor category tasks before scheduling a successor category', () => {
+    const document = createPlanDocument({ startWeek: 1, startingResourceCount: 5 });
+    document.categories = [
+      { id: 'category-1', name: 'Foundation', order: 1 },
+      { id: 'category-2', name: 'Delivery', order: 2 },
+    ];
+    document.tasks = [
+      { id: 'task-1', categoryId: 'category-1', name: 'Foundation A', priority: 1, estimateWeeks: 3 },
+      { id: 'task-2', categoryId: 'category-1', name: 'Foundation B', priority: 2, estimateWeeks: 4 },
+      { id: 'task-3', categoryId: 'category-2', name: 'Delivery A', priority: 3, estimateWeeks: 1 },
+    ];
+    document.dependencies = [
+      {
+        id: 'dep-1',
+        predecessorType: 'category',
+        predecessorId: 'category-1',
+        successorType: 'category',
+        successorId: 'category-2',
+      },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 3, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 2, isManual: false },
+      { taskId: 'task-2', weekIndex: 2, allocatedUnits: 2, isManual: false },
+      { taskId: 'task-3', weekIndex: 3, allocatedUnits: 1, isManual: false },
+    ]);
+  });
+
+  it('keeps completed task history frozen when inputs later change', () => {
+    const document = createPlanDocument({ startWeek: 1, startingResourceCount: 5 });
+    document.tasks = [
+      {
+        id: 'task-1',
+        name: 'Historical task',
+        priority: 1,
+        estimateWeeks: 99,
+        completed: true,
+        completedIntervals: [
+          { startWeek: 1, endWeek: 2, allocatedUnits: 2 },
+          { startWeek: 3, endWeek: 3, allocatedUnits: 1 },
+        ],
+      },
+      {
+        id: 'task-2',
+        name: 'Next task',
+        priority: 2,
+        estimateWeeks: 2,
+      },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 2, isManual: false, isCompleted: true },
+      { taskId: 'task-1', weekIndex: 2, allocatedUnits: 2, isManual: false, isCompleted: true },
+      { taskId: 'task-1', weekIndex: 3, allocatedUnits: 1, isManual: false, isCompleted: true },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 2, isManual: false },
+    ]);
+  });
+
   it('names the tasks involved when reporting dependency cycles', () => {
     const document = createPlanDocument({ startWeek: 1, startingResourceCount: 5 });
     document.tasks = [

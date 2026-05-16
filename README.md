@@ -23,11 +23,12 @@ npm run test:watch
 
 ## Data Storage
 
-The URL hash is the active saved state. Manual `Save`, `Save as`, and `Load` actions keep named local snapshots in `localStorage` when the user explicitly asks for them.
+The URL hash is the active saved state. Manual `Save`, `Save as`, and `Load` actions keep named local snapshots in `localStorage` when the user explicitly asks for them. `Backup/restore` downloads or restores the full local snapshot library in one JSON file.
 
 The hash stores a compact source-only document and the app regenerates ISO weeks, sprints, and computed schedule rows in memory.
 
 Task cell edits are saved as compact resource rules: setting a task to `x` resources in a week applies `x` from that week onward until another rule is added.
+Completed historical tasks store only compact frozen resource intervals, so old schedule history stays stable without bloating the URL.
 
 ## Export
 
@@ -49,6 +50,7 @@ Task cell edits are saved as compact resource rules: setting a task to `x` resou
 - Working days default to 5; set 4 for a week with one national holiday.
 - Vacation days are person-days. They can apply to the entire plan or to a selected category; 10 vacation days equals two people away for one five-day week.
 - Editing a past week asks for confirmation before changing historical plan data.
+- Tasks in the past, or already in their final execution week, can be marked completed. Very old tasks are completed automatically on load, and their frozen history is removed again if the timeline is moved back into the future. Completed tasks show a subtle italic label plus a check icon in the grid.
 - Selecting a category before adding a task makes the task inherit that category and color.
 - `Task`, `Category`, and `Dependency` open small focused side panels. New task/category names are preselected so typing replaces the starter text immediately. Dependency creation supports external deadlines and internal task-to-task dependencies.
 - Numeric fields use plain edit boxes rather than browser increment controls.

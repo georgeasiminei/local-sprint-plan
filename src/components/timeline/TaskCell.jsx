@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTimelineStore } from '../../store/index.js';
 
-export default function TaskCell({ taskId, taskName, week, rowHeight, allocation, isManual, isOverride, cellColor }) {
+export default function TaskCell({ taskId, taskName, week, rowHeight, allocation, isManual, isOverride, isLocked, cellColor }) {
   const [isEditing, setIsEditing] = useState(false);
   const requestWeekEdit = useTimelineStore((state) => state.requestWeekEdit);
   const setTaskResourceFromWeek = useTimelineStore((state) => state.setTaskResourceFromWeek);
@@ -16,19 +16,19 @@ export default function TaskCell({ taskId, taskName, week, rowHeight, allocation
 
   return (
     <div
-      role={week && taskId ? 'button' : undefined}
-      tabIndex={week && taskId ? 0 : undefined}
-      aria-label={week && taskId ? `Set ${taskName ?? 'task'} resources in ${week.label}` : undefined}
+      role={week && taskId && !isLocked ? 'button' : undefined}
+      tabIndex={week && taskId && !isLocked ? 0 : undefined}
+      aria-label={week && taskId && !isLocked ? `Set ${taskName ?? 'task'} resources in ${week.label}` : undefined}
       className="overflow-hidden border-b border-r border-slate-200 px-1 text-center text-xs"
       style={{ height: rowHeight, lineHeight: `${rowHeight}px`, ...(cellColor ? { backgroundColor: cellColor } : {}) }}
       onClick={(event) => {
         event.stopPropagation();
-        if (week) {
+        if (week && !isLocked) {
           setIsEditing(true);
         }
       }}
       onKeyDown={(event) => {
-        if ((event.key === 'Enter' || event.key === ' ') && week) {
+        if ((event.key === 'Enter' || event.key === ' ') && week && !isLocked) {
           event.preventDefault();
           setIsEditing(true);
         }

@@ -66,7 +66,6 @@ describe('URL-owned app state', () => {
     expect(window.location.hash).toBe('');
 
     await user.click(screen.getByRole('button', { name: 'New category' }));
-    await user.click(screen.getByRole('button', { name: 'New task' }));
 
     await waitFor(() => expect(window.location.hash).toMatch(/^#(j|b|d)\./));
     const writtenHash = window.location.hash;
@@ -75,7 +74,11 @@ describe('URL-owned app state', () => {
     resetStore();
     render(<App />);
 
-    expect(await screen.findByText('Task 1')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(useTimelineStore.getState().getActiveDocument().categories).toEqual([
+        expect.objectContaining({ name: 'New category' }),
+      ]);
+    });
     expect(window.location.hash).toBe(writtenHash);
   });
 
@@ -85,7 +88,7 @@ describe('URL-owned app state', () => {
     render(<App />);
     await screen.findByText('Nothing is sent to a server, all data stays in this computer');
 
-    await user.click(screen.getByRole('button', { name: 'New task' }));
+    await user.click(screen.getByRole('button', { name: 'New category' }));
     const writtenHash = window.location.hash;
     expect(writtenHash).toMatch(/^#j\./);
 
@@ -93,7 +96,11 @@ describe('URL-owned app state', () => {
     resetStore();
     render(<App />);
 
-    expect(await screen.findByText('Task 1')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(useTimelineStore.getState().getActiveDocument().categories).toEqual([
+        expect.objectContaining({ name: 'New category' }),
+      ]);
+    });
     expect(window.location.hash).toBe(writtenHash);
   });
 
@@ -104,6 +111,14 @@ describe('URL-owned app state', () => {
     for (const button of screen.getAllByRole('button')) {
       expect(button, button.outerHTML).toHaveAttribute('data-tooltip');
     }
+  });
+
+  it('shows the original repository note in the toolbar', async () => {
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    const link = screen.getByRole('link', { name: 'zupermann/local-sprint-plan' });
+    expect(link).toHaveAttribute('href', 'https://github.com/zupermann/local-sprint-plan');
   });
 
   it('undoes and redoes changes through session-only toolbar history', async () => {
@@ -161,6 +176,43 @@ describe('URL-owned app state', () => {
     const document = useTimelineStore.getState().getActiveDocument();
     expect(document.plan.rowHeight).toBe(24);
     expect(document.plan.weekColumnWidth).toBe(72);
+  });
+
+  it('shows concise internal dependency labels and lets settings hide them', async () => {
+    const user = userEvent.setup();
+    const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { startYear: weekYear, startWeek: weekNumber, startingResourceCount: 1 },
+        tasks: [
+          { id: 'task-1', name: 'API', priority: 1, estimateWeeks: 1 },
+          { id: 'task-2', name: 'UI', priority: 2, estimateWeeks: 1 },
+        ],
+        dependencies: [
+          {
+            id: 'dep-1',
+            predecessorType: 'task',
+            predecessorId: 'task-1',
+            successorType: 'task',
+            successorId: 'task-2',
+            lagWeeks: 0,
+          },
+        ],
+      }),
+    );
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+
+    expect(await screen.findByText('API → UI')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    const toggle = await screen.findByLabelText('Show internal dependency lines');
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+
+    expect(screen.queryByText('API → UI')).not.toBeInTheDocument();
+    expect(useTimelineStore.getState().getActiveDocument().plan.showInternalDependencyLines).toBe(false);
   });
 
   it('opens an item panel from the grid and closes it with the panel x', async () => {
@@ -223,6 +275,178 @@ describe('URL-owned app state', () => {
     expect(screen.getByRole('button', { name: 'External' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Internal' })).toBeInTheDocument();
     expect(useTimelineStore.getState().getActiveDocument().externalDependencies).toHaveLength(0);
+  });
+
+  it('creates and reopens internal dependencies for tasks and categories', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    act(() => {
+      const store = useTimelineStore.getState();
+      store.addCategory('Foundation');
+      store.addCategory('Delivery');
+      store.addTask({ name: 'Implementation' });
+    });
+
+    await user.click(screen.getByRole('button', { name: 'New dependency' }));
+    await user.click(await screen.findByRole('button', { name: 'Internal' }));
+    await user.click(screen.getAllByRole('button', { name: 'Category' })[0]);
+    await user.selectOptions(screen.getAllByRole('combobox')[0], 'Foundation');
+    await user.click(screen.getAllByRole('button', { name: 'Category' })[1]);
+    await user.selectOptions(screen.getAllByRole('combobox')[1], 'Delivery');
+    await user.click(screen.getByRole('button', { name: 'Add internal dependency' }));
+
+    expect((await screen.findAllByText('Delivery')).length).toBeGreaterThan(0);
+    expect(screen.getByText(/depends on Foundation/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Close panel' }));
+    await user.click(screen.getByRole('button', { name: 'Show internal dependencies for Delivery' }));
+
+    expect(await screen.findByText('Internal dependencies')).toBeInTheDocument();
+    expect(screen.getByText('Depends on')).toBeInTheDocument();
+    expect(screen.getAllByText('Foundation').length).toBeGreaterThan(0);
+  });
+
+  it('lets a task in its last execution week be marked completed and freezes intervals', async () => {
+    const user = userEvent.setup();
+    const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { startYear: weekYear, startWeek: weekNumber, startingResourceCount: 1 },
+        tasks: [{ id: 'task-1', name: 'Finishing task', priority: 1, estimateWeeks: 1 }],
+      }),
+    );
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+    await user.click(await screen.findByText('Finishing task'));
+    const checkbox = await screen.findByRole('checkbox', { name: /Completed/i });
+    await user.click(checkbox);
+
+    await waitFor(() => {
+      const task = useTimelineStore.getState().getActiveDocument().tasks[0];
+      expect(task.completed).toBe(true);
+      expect(task.completedIntervals).toEqual([
+        expect.objectContaining({ startWeek: weekNumber, endWeek: weekNumber, allocatedUnits: 1 }),
+      ]);
+    });
+  });
+
+  it('marks completed tasks visibly in the timeline', async () => {
+    const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { startYear: weekYear, startWeek: weekNumber, startingResourceCount: 1 },
+        tasks: [
+          {
+            id: 'task-1',
+            name: 'Frozen task',
+            priority: 1,
+            estimateWeeks: 1,
+            completed: true,
+            completedIntervals: [{ startWeek: weekNumber, endWeek: weekNumber, allocatedUnits: 1 }],
+          },
+        ],
+      }),
+    );
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+
+    const taskLabel = await screen.findByText('Frozen task');
+    expect(taskLabel).toHaveClass('italic');
+    expect(screen.getByRole('img', { name: 'Frozen task completed' })).toBeInTheDocument();
+  });
+
+  it('auto-completes tasks older than three weeks on load', async () => {
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { startYear: 2020, startWeek: 1, startingResourceCount: 1 },
+        tasks: [{ id: 'task-1', name: 'Old task', priority: 1, estimateWeeks: 1 }],
+      }),
+    );
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+
+    await waitFor(() => {
+      const task = useTimelineStore.getState().getActiveDocument().tasks[0];
+      expect(task.completed).toBe(true);
+      expect(task.completedIntervals).toEqual([
+        expect.objectContaining({ startWeek: 1, endWeek: 1, allocatedUnits: 1 }),
+      ]);
+    });
+  });
+
+  it('removes frozen completion data if a timeframe change makes the task future work', async () => {
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { startYear: 2020, startWeek: 1, startingResourceCount: 1 },
+        tasks: [
+          {
+            id: 'task-1',
+            name: 'Formerly historical task',
+            priority: 1,
+            estimateWeeks: 1,
+            completed: true,
+            completedIntervals: [{ startWeek: 1, endWeek: 1, allocatedUnits: 1 }],
+          },
+        ],
+      }),
+    );
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+    await screen.findByText('Formerly historical task');
+
+    act(() => {
+      useTimelineStore.getState().updatePlanSettings({ startYear: 2030 });
+    });
+
+    await waitFor(() => {
+      const task = useTimelineStore.getState().getActiveDocument().tasks[0];
+      expect(task.completed).toBeUndefined();
+      expect(task.completedIntervals).toBeUndefined();
+    });
+  });
+
+  it('prevents circular dependencies even for empty categories', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    act(() => {
+      const store = useTimelineStore.getState();
+      store.addCategory('Foundation');
+      store.addCategory('Delivery');
+      const document = store.getActiveDocument();
+      store.addDependency(document.categories[0].id, document.categories[1].id, 0, 'category', 'category');
+    });
+
+    const store = useTimelineStore.getState();
+    const document = store.getActiveDocument();
+    const blockedId = store.addDependency(
+      document.categories[1].id,
+      document.categories[0].id,
+      0,
+      'category',
+      'category',
+    );
+    expect(blockedId).toBeNull();
+    expect(useTimelineStore.getState().getActiveDocument().dependencies).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'New dependency' }));
+    await user.click(await screen.findByRole('button', { name: 'Internal' }));
+    await user.click(screen.getAllByRole('button', { name: 'Category' })[0]);
+    await user.selectOptions(screen.getAllByRole('combobox')[0], 'Delivery');
+    await user.click(screen.getAllByRole('button', { name: 'Category' })[1]);
+
+    const waitingOptions = [...screen.getAllByRole('combobox')[1].options];
+    expect(waitingOptions.find((option) => option.text === 'Foundation')).toBeDisabled();
+    expect(screen.getByText(/circular dependency are disabled/i)).toBeInTheDocument();
   });
 
   it('reschedules category tasks when vacation days change', async () => {
@@ -494,6 +718,50 @@ describe('URL-owned app state', () => {
     expect(screen.queryByText('Disposable')).not.toBeInTheDocument();
   });
 
+  it('restores all saved plans from a backup so they appear under load', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    await user.click(screen.getByRole('button', { name: 'Backup/restore' }));
+    expect(await screen.findByText('Backup all saved plans')).toBeInTheDocument();
+    expect(screen.getByText(/overwrites every locally saved plan/i)).toBeInTheDocument();
+
+    const backupFile = new File(
+      [
+        JSON.stringify({
+          version: 1,
+          exportedAt: '2026-05-16T00:00:00.000Z',
+          savedPlans: [
+            {
+              id: 'sp1',
+              name: 'Recovered A',
+              savedAt: '2026-05-16T00:00:00.000Z',
+              document: [[], [], [[null, 'Recovered task']]],
+            },
+            {
+              id: 'sp2',
+              name: 'Recovered B',
+              savedAt: '2026-05-16T01:00:00.000Z',
+              document: [[], [], [[null, 'Another recovered task']]],
+            },
+          ],
+        }),
+      ],
+      'backup.json',
+      { type: 'application/json' },
+    );
+
+    const input = document.querySelector('input[type="file"]');
+    await user.upload(input, backupFile);
+    await user.click(screen.getByRole('button', { name: 'Restore backup and overwrite all plans' }));
+
+    await user.click(screen.getByRole('button', { name: 'Load' }));
+    expect(await screen.findByText('Recovered A')).toBeInTheDocument();
+    expect(screen.getByText('Recovered B')).toBeInTheDocument();
+  });
+
   it('loads compact JSON files from the load dialog', async () => {
     const user = userEvent.setup();
 
@@ -623,6 +891,7 @@ function resetStore() {
     savedPlanId: null,
     savedPlanName: null,
     scheduleWarnings: [],
+    hasAppliedAutoCompletion: false,
     selectedTaskId: null,
     selectedCategoryId: null,
     selectedDependencyId: null,

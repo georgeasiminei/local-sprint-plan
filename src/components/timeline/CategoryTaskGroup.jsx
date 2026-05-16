@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useTimelineStore } from '../../store/index.js';
 import { formatNumber } from '../../utils/format.js';
 import TaskCell from './TaskCell.jsx';
@@ -7,8 +7,18 @@ import {
   TASK_COLUMN_WIDTH,
   weekGridColumns,
 } from './layout.js';
+import { getDependenciesForEntity } from '../../utils/dependencies.js';
 
-export default function CategoryTaskGroup({ category, isSynthetic = false, rowHeight, schedule, tasks, weeks, weekColumnWidth }) {
+export default function CategoryTaskGroup({
+  category,
+  document,
+  isSynthetic = false,
+  rowHeight,
+  schedule,
+  tasks,
+  weeks,
+  weekColumnWidth,
+}) {
   const selectCategory = useTimelineStore((state) => state.selectCategory);
   const selectTask = useTimelineStore((state) => state.selectTask);
   const selectedCategoryId = useTimelineStore((state) => state.selectedCategoryId);
@@ -19,6 +29,7 @@ export default function CategoryTaskGroup({ category, isSynthetic = false, rowHe
   const visibleTasks = category.collapsed ? [] : tasks;
   const rowCount = Math.max(visibleTasks.length, 1);
   const totals = getTaskTotals(tasks);
+  const categoryDependencies = getDependenciesForEntity(document, 'category', category.id);
 
   return (
     <section
@@ -55,6 +66,22 @@ export default function CategoryTaskGroup({ category, isSynthetic = false, rowHe
             {category.collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
             <span className="truncate">{category.name}</span>
           </button>
+          {categoryDependencies.length > 0 ? (
+            <button
+              type="button"
+              className="app-tooltip ml-1 inline-flex size-5 items-center justify-center rounded text-slate-700 hover:bg-white/70"
+              data-tooltip="Has internal dependencies"
+              aria-label={`Show internal dependencies for ${category.name}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (!isSynthetic) {
+                  selectCategory(category.id);
+                }
+              }}
+            >
+              <Info size={13} />
+            </button>
+          ) : null}
           <div className="px-1 text-[10px] font-medium text-slate-600">
             {tasks.length} tasks
           </div>
@@ -71,6 +98,7 @@ export default function CategoryTaskGroup({ category, isSynthetic = false, rowHe
             row={index + 1}
             rowHeight={rowHeight}
             task={task}
+            document={document}
             weeks={weeks}
             schedule={schedule}
             rowColor={task.highlightColor ?? category.color}
@@ -91,6 +119,7 @@ function TaskGridRow({
   row,
   rowHeight,
   task,
+  document,
   weeks,
   schedule,
   rowColor,
@@ -100,6 +129,7 @@ function TaskGridRow({
   weekColumnWidth,
 }) {
   const taskSchedule = schedule.filter((item) => item.taskId === task.id);
+  const taskDependencies = getDependenciesForEntity(document, 'task', task.id);
 
   return (
     <>
@@ -122,9 +152,37 @@ function TaskGridRow({
           />
         </label>
         <div className="min-w-0 overflow-hidden px-2">
-          <p className="truncate text-xs font-medium leading-[inherit]" style={{ lineHeight: `${rowHeight}px` }}>
-            {task.name}
-          </p>
+          <div className="flex min-w-0 items-center gap-1">
+            <p
+              className={`truncate text-xs font-medium leading-[inherit] ${task.completed ? 'italic text-slate-600' : ''}`}
+              style={{ lineHeight: `${rowHeight}px` }}
+            >
+              {task.name}
+            </p>
+            {task.completed ? (
+              <CheckCircle2
+                aria-label={`${task.name} completed`}
+                role="img"
+                title="Completed"
+                className="shrink-0 text-emerald-600"
+                size={13}
+              />
+            ) : null}
+            {taskDependencies.length > 0 ? (
+              <button
+                type="button"
+                className="app-tooltip inline-flex shrink-0 items-center justify-center text-slate-500 hover:text-slate-700"
+                data-tooltip="Has internal dependencies"
+                aria-label={`Show internal dependencies for ${task.name}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  selectTask(task.id);
+                }}
+              >
+                <Info size={13} />
+              </button>
+            ) : null}
+          </div>
         </div>
         <div className="overflow-hidden border-l border-line px-1 text-center text-xs" style={{ lineHeight: `${rowHeight}px` }}>
           {formatNumber(task.estimateWeeks)}
@@ -156,6 +214,7 @@ function TaskGridRow({
                 allocation={entry?.allocatedUnits}
                 isManual={entry?.isManual}
                 isOverride={isOverride}
+                isLocked={task.completed}
                 cellColor={entry?.allocatedUnits ? rowColor : null}
               />
             );

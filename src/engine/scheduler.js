@@ -1,5 +1,5 @@
 import { MAX_CALCULATED_WEEKS, MIN_VISIBLE_WEEKS } from '../constants/defaults.js';
-import { topologicalSort } from './dependencyGraph.js';
+import { expandDependenciesToTaskEdges, topologicalSort } from './dependencyGraph.js';
 import {
   applyFreeDays,
   applyVacationDays,
@@ -9,17 +9,20 @@ import {
   resolveWeekResourceCount,
 } from './resourceResolver.js';
 import { buildCalculatedWeeks, buildFixedSprints } from './timeline.js';
+import { expandCompletedIntervals } from './taskCompletion.js';
 
 export function recalculateSchedule(document) {
   const tasks = [...(document.tasks ?? [])].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
   const dependencies = document.dependencies ?? [];
+  const categories = document.categories ?? [];
+  const expandedDependencies = expandDependenciesToTaskEdges(tasks, categories, dependencies);
   const firstTeam = document.teams?.[0];
   const startWeek = Number(document.plan?.startWeek) || 1;
   const startYear = Number(document.plan?.startYear) || new Date().getFullYear();
   const sprintStartNumber = Number(document.plan?.sprintStartNumber) || 1;
   const sprintStartOrder = Number(document.plan?.sprintStartOrder) || 1;
   const startingResourceCount = Number(document.plan?.startingResourceCount) || 0;
-  const { sortedIds, hasCycle, cycleNodes } = topologicalSort(tasks, dependencies);
+  const { sortedIds, hasCycle, cycleNodes } = topologicalSort(tasks, dependencies, categories);
 
   if (hasCycle) {
     const weeks = buildCalculatedWeeks(startWeek, document.weeks?.length || MIN_VISIBLE_WEEKS, startYear);
@@ -37,12 +40,19 @@ export function recalculateSchedule(document) {
   }
 
   const taskById = new Map(tasks.map((task) => [task.id, task]));
-  const categoryById = new Map((document.categories ?? []).map((category) => [category.id, category]));
-  const dependenciesBySuccessor = groupDependenciesBySuccessor(dependencies);
-  const manualEntries = (document.schedule ?? []).filter(
-    (entry) => entry.isManual && tasks.some((task) => task.id === entry.taskId),
+  const categoryById = new Map(categories.map((category) => [category.id, category]));
+  const dependenciesBySuccessor = groupDependenciesBySuccessor(expandedDependencies);
+  const completedTaskIds = new Set(tasks.filter((task) => task.completed).map((task) => task.id));
+  const completedEntries = tasks.flatMap((task) =>
+    task.completed ? expandCompletedIntervals(task.id, task.completedIntervals ?? []) : [],
   );
-  const allocatedByWeek = createManualAllocationMap(manualEntries);
+  const manualEntries = (document.schedule ?? []).filter(
+    (entry) =>
+      entry.isManual &&
+      !completedTaskIds.has(entry.taskId) &&
+      tasks.some((task) => task.id === entry.taskId),
+  );
+  const allocatedByWeek = createManualAllocationMap([...manualEntries, ...completedEntries]);
   const manualEntriesByTask = groupManualEntriesByTask(manualEntries);
   const completionWeekByTask = new Map();
   const schedule = [];
@@ -52,6 +62,15 @@ export function recalculateSchedule(document) {
 
   for (const taskId of sortedIds) {
     const task = taskById.get(taskId);
+    if (task.completed) {
+      const entries = completedEntries.filter((entry) => entry.taskId === task.id);
+      schedule.push(...entries);
+      if (entries.length > 0) {
+        completionWeekByTask.set(task.id, entries.at(-1).weekIndex);
+      }
+      continue;
+    }
+
     const earliestStartWeek = getEarliestStartWeek(task, dependenciesBySuccessor, completionWeekByTask, startWeek);
     const result = scheduleTask({
       task,
@@ -101,7 +120,9 @@ export function recalculateSchedule(document) {
   const lastScheduledWeek = Math.max(
     startWeek + MIN_VISIBLE_WEEKS - 1,
     ...schedule.map((entry) => entry.weekIndex),
-    ...dependencies.map((dependency) => dependency.successorId ? completionWeekByTask.get(dependency.successorId) ?? startWeek : startWeek),
+    ...expandedDependencies.map((dependency) =>
+      dependency.successorId ? completionWeekByTask.get(dependency.successorId) ?? startWeek : startWeek,
+    ),
     ...(document.externalDependencies ?? []).map((dependency) => dependency.dueWeek ?? dependency.endWeek ?? dependency.startWeek ?? startWeek),
   );
   const finalWeekCount = Math.max(MIN_VISIBLE_WEEKS, lastScheduledWeek - startWeek + 1);

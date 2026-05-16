@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import { CheckSquare, MinusSquare, Square, Trash2 } from 'lucide-react';
 import { MAX_CALCULATED_WEEKS } from '../../constants/defaults.js';
-import { topologicalSort } from '../../engine/dependencyGraph.js';
+import { wouldCreateDependencyCycle } from '../../engine/dependencyGraph.js';
 import { buildCalculatedWeeks } from '../../engine/timeline.js';
 import { useTimelineStore } from '../../store/index.js';
+import {
+  getDependencyEndpoint,
+  getDependencyEntityName,
+  getDependencyEntityOptions,
+} from '../../utils/dependencies.js';
 import Sidebar from '../layout/Sidebar.jsx';
 import Button from '../ui/Button.jsx';
 import Input from '../ui/Input.jsx';
@@ -13,7 +18,9 @@ export default function DependencyDetailPanel({ document }) {
   const [mode, setMode] = useState('external');
   const [externalText, setExternalText] = useState('');
   const [externalDueWeekLabel, setExternalDueWeekLabel] = useState(getDefaultDueWeekLabel(document));
+  const [predecessorType, setPredecessorType] = useState('task');
   const [predecessorId, setPredecessorId] = useState('');
+  const [successorType, setSuccessorType] = useState('task');
   const [successorId, setSuccessorId] = useState('');
   const [lagWeeks, setLagWeeks] = useState(0);
   const [error, setError] = useState('');
@@ -86,26 +93,32 @@ export default function DependencyDetailPanel({ document }) {
     setError('');
 
     if (!predecessorId || !successorId) {
-      setError('Choose both tasks.');
+      setError('Choose both items.');
       return;
     }
 
-    if (predecessorId === successorId) {
-      setError('A task cannot depend on itself.');
+    if (predecessorType === successorType && predecessorId === successorId) {
+      setError('An item cannot depend on itself.');
       return;
     }
 
-    const candidateDependencies = [
-      ...(document.dependencies ?? []),
-      { id: 'candidate', predecessorId, successorId, lagWeeks: Number(lagWeeks) || 0 },
-    ];
-    if (topologicalSort(document.tasks, candidateDependencies).hasCycle) {
+    const candidate = {
+      id: 'candidate',
+      predecessorId,
+      predecessorType,
+      successorId,
+      successorType,
+      lagWeeks: Number(lagWeeks) || 0,
+    };
+    if (wouldCreateDependencyCycle(document, candidate)) {
       setError('That dependency would create a cycle.');
       return;
     }
 
-    addDependency(predecessorId, successorId, Number(lagWeeks) || 0);
+    addDependency(predecessorId, successorId, Number(lagWeeks) || 0, predecessorType, successorType);
+    setPredecessorType('task');
     setPredecessorId('');
+    setSuccessorType('task');
     setSuccessorId('');
     setLagWeeks(0);
   }
@@ -152,24 +165,49 @@ export default function DependencyDetailPanel({ document }) {
           <div className="space-y-3">
             <label className="block text-sm font-medium">
               Depends on
-              <TaskSelect
+              <DependencyEntitySelect
                 className="mt-1 w-full"
                 document={document}
-                placeholder="Predecessor task"
+                type={predecessorType}
+                disabledOptionIds={getBlockedEndpointIds(document, {
+                  side: 'predecessor',
+                  type: predecessorType,
+                  oppositeType: successorType,
+                  oppositeId: successorId,
+                })}
+                onTypeChange={(type) => {
+                  setPredecessorType(type);
+                  setPredecessorId('');
+                }}
+                placeholder={`Predecessor ${predecessorType}`}
                 value={predecessorId}
                 onChange={setPredecessorId}
               />
             </label>
             <label className="block text-sm font-medium">
-              Task
-              <TaskSelect
+              Waiting item
+              <DependencyEntitySelect
                 className="mt-1 w-full"
                 document={document}
-                placeholder="Successor task"
+                type={successorType}
+                disabledOptionIds={getBlockedEndpointIds(document, {
+                  side: 'successor',
+                  type: successorType,
+                  oppositeType: predecessorType,
+                  oppositeId: predecessorId,
+                })}
+                onTypeChange={(type) => {
+                  setSuccessorType(type);
+                  setSuccessorId('');
+                }}
+                placeholder={`Waiting ${successorType}`}
                 value={successorId}
                 onChange={setSuccessorId}
               />
             </label>
+            {predecessorId || successorId ? (
+              <p className="text-xs text-slate-500">Choices that would create a circular dependency are disabled.</p>
+            ) : null}
             <label className="block text-sm font-medium">
               Lag weeks
               <Input
@@ -194,14 +232,109 @@ export default function DependencyDetailPanel({ document }) {
 }
 
 function InternalDependencyEditor({ dependency, document, onDelete, onUpdate }) {
-  const taskById = new Map(document.tasks.map((task) => [task.id, task]));
+  const [error, setError] = useState('');
+  const predecessor = getDependencyEndpoint(document, dependency, 'predecessor');
+  const successor = getDependencyEndpoint(document, dependency, 'successor');
+  const [draftPredecessorType, setDraftPredecessorType] = useState(predecessor.type ?? 'task');
+  const [draftPredecessorId, setDraftPredecessorId] = useState(predecessor.id ?? '');
+  const [draftSuccessorType, setDraftSuccessorType] = useState(successor.type ?? 'task');
+  const [draftSuccessorId, setDraftSuccessorId] = useState(successor.id ?? '');
+
+  useEffect(() => {
+    setDraftPredecessorType(predecessor.type ?? 'task');
+    setDraftPredecessorId(predecessor.id ?? '');
+    setDraftSuccessorType(successor.type ?? 'task');
+    setDraftSuccessorId(successor.id ?? '');
+  }, [predecessor.id, predecessor.type, successor.id, successor.type]);
+
+  function commitEndpointPatch(patch) {
+    const candidate = { ...dependency, ...patch };
+    const nextPredecessor = getDependencyEndpoint(document, candidate, 'predecessor');
+    const nextSuccessor = getDependencyEndpoint(document, candidate, 'successor');
+
+    if (
+      nextPredecessor.type === nextSuccessor.type &&
+      nextPredecessor.id &&
+      nextPredecessor.id === nextSuccessor.id
+    ) {
+      setError('An item cannot depend on itself.');
+      return;
+    }
+
+    if (wouldCreateDependencyCycle(document, candidate, dependency.id)) {
+      setError('That change would create a cycle.');
+      return;
+    }
+
+    setError('');
+    onUpdate(dependency.id, patch);
+  }
 
   return (
     <div className="space-y-4">
       <div className="rounded border border-line p-3 text-sm">
-        <div className="font-medium">{taskById.get(dependency.successorId)?.name ?? 'Missing task'}</div>
-        <div className="text-slate-500">depends on {taskById.get(dependency.predecessorId)?.name ?? 'Missing task'}</div>
+        <div className="font-medium">
+          {getDependencyEntityName(document, successor.type, successor.id)}
+        </div>
+        <div className="text-slate-500">
+          depends on {getDependencyEntityName(document, predecessor.type, predecessor.id)}
+        </div>
       </div>
+      <label className="block text-sm font-medium">
+        Depends on
+        <DependencyEntitySelect
+          className="mt-1 w-full"
+          document={document}
+          type={draftPredecessorType}
+          disabledOptionIds={getBlockedEndpointIds(document, {
+            side: 'predecessor',
+            type: draftPredecessorType,
+            oppositeType: draftSuccessorType,
+            oppositeId: draftSuccessorId,
+            dependencyId: dependency.id,
+            currentValue: draftPredecessorId,
+          })}
+          onTypeChange={(type) => {
+            setDraftPredecessorType(type);
+            setDraftPredecessorId('');
+            setError('');
+          }}
+          placeholder={`Predecessor ${draftPredecessorType}`}
+          value={draftPredecessorId}
+          onChange={(value) => {
+            setDraftPredecessorId(value);
+            commitEndpointPatch({ predecessorType: draftPredecessorType, predecessorId: value });
+          }}
+        />
+      </label>
+      <label className="block text-sm font-medium">
+        Waiting item
+        <DependencyEntitySelect
+          className="mt-1 w-full"
+          document={document}
+          type={draftSuccessorType}
+          disabledOptionIds={getBlockedEndpointIds(document, {
+            side: 'successor',
+            type: draftSuccessorType,
+            oppositeType: draftPredecessorType,
+            oppositeId: draftPredecessorId,
+            dependencyId: dependency.id,
+            currentValue: draftSuccessorId,
+          })}
+          onTypeChange={(type) => {
+            setDraftSuccessorType(type);
+            setDraftSuccessorId('');
+            setError('');
+          }}
+          placeholder={`Waiting ${draftSuccessorType}`}
+          value={draftSuccessorId}
+          onChange={(value) => {
+            setDraftSuccessorId(value);
+            commitEndpointPatch({ successorType: draftSuccessorType, successorId: value });
+          }}
+        />
+      </label>
+      <p className="text-xs text-slate-500">Choices that would create a circular dependency are disabled.</p>
       <label className="block text-sm font-medium">
         Lag weeks
         <Input
@@ -212,6 +345,7 @@ function InternalDependencyEditor({ dependency, document, onDelete, onUpdate }) 
           onChange={(event) => onUpdate(dependency.id, { lagWeeks: Number(event.target.value) })}
         />
       </label>
+      {error ? <p className="text-xs text-red-700">{error}</p> : null}
       <Button variant="ghost" className="w-full justify-center text-red-700 hover:text-red-800" onClick={onDelete}>
         <Trash2 size={16} />
         Delete dependency
@@ -272,8 +406,6 @@ function ExternalDependencyEditor({ dependency, document, onDelete, onRequestWee
 function DependencyLists({ document }) {
   const selectDependency = useTimelineStore((state) => state.selectDependency);
   const selectExternalDependency = useTimelineStore((state) => state.selectExternalDependency);
-  const taskById = new Map(document.tasks.map((task) => [task.id, task]));
-
   if ((document.dependencies ?? []).length === 0 && (document.externalDependencies ?? []).length === 0) {
     return null;
   }
@@ -288,8 +420,8 @@ function DependencyLists({ document }) {
           data-tooltip="Open internal dependency"
           onClick={() => selectDependency(dependency.id)}
         >
-          <span className="font-medium">{taskById.get(dependency.successorId)?.name ?? 'Missing task'}</span>
-          <span className="text-slate-500"> depends on {taskById.get(dependency.predecessorId)?.name ?? 'Missing task'}</span>
+          <span className="font-medium">{formatDependencyEndpoint(document, dependency, 'successor')}</span>
+          <span className="text-slate-500"> depends on {formatDependencyEndpoint(document, dependency, 'predecessor')}</span>
         </button>
       ))}
       {(document.externalDependencies ?? []).map((dependency) => (
@@ -308,17 +440,82 @@ function DependencyLists({ document }) {
   );
 }
 
-function TaskSelect({ className, document, onChange, placeholder, value }) {
+function DependencyEntitySelect({
+  className,
+  disabledOptionIds = [],
+  document,
+  onChange,
+  onTypeChange,
+  placeholder,
+  type,
+  value,
+}) {
+  const options = getDependencyEntityOptions(document, type);
+
   return (
-    <Select className={className} value={value} onChange={(event) => onChange(event.target.value)}>
-      <option value="">{placeholder}</option>
-      {document.tasks.map((task) => (
-        <option key={task.id} value={task.id}>
-          {task.name}
-        </option>
-      ))}
-    </Select>
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        {['task', 'category'].map((candidateType) => (
+          <Button
+            key={candidateType}
+            type="button"
+            variant={type === candidateType ? 'primary' : 'secondary'}
+            onClick={() => onTypeChange(candidateType)}
+          >
+            {candidateType === 'task' ? 'Task' : 'Category'}
+          </Button>
+        ))}
+      </div>
+      <Select className={className} value={value} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id} disabled={disabledOptionIds.includes(option.id)}>
+            {option.name}
+          </option>
+        ))}
+      </Select>
+    </div>
   );
+}
+
+function getBlockedEndpointIds(document, { side, type, oppositeType, oppositeId, dependencyId = null, currentValue = '' }) {
+  if (!oppositeId) {
+    return [];
+  }
+
+  return getDependencyEntityOptions(document, type)
+    .filter((option) => option.id !== currentValue)
+    .filter((option) => {
+      const candidate =
+        side === 'predecessor'
+          ? {
+              id: dependencyId ?? 'candidate',
+              predecessorId: option.id,
+              predecessorType: type,
+              successorId: oppositeId,
+              successorType: oppositeType,
+            }
+          : {
+              id: dependencyId ?? 'candidate',
+              predecessorId: oppositeId,
+              predecessorType: oppositeType,
+              successorId: option.id,
+              successorType: type,
+            };
+
+      const isSelfDependency =
+        candidate.predecessorType === candidate.successorType &&
+        candidate.predecessorId === candidate.successorId;
+
+      return isSelfDependency || wouldCreateDependencyCycle(document, candidate, dependencyId);
+    })
+    .map((option) => option.id);
+}
+
+function formatDependencyEndpoint(document, dependency, side) {
+  const endpoint = getDependencyEndpoint(document, dependency, side);
+  const prefix = endpoint.type === 'category' ? 'Category: ' : 'Task: ';
+  return `${prefix}${getDependencyEntityName(document, endpoint.type, endpoint.id)}`;
 }
 
 function StatusCycleButton({ status, onCycle }) {

@@ -1,6 +1,7 @@
 import { compactPlanDocument, expandCompactPlanDocument } from './shareUrl.js';
 
 const STORAGE_KEY = 'timeline.savedPlans';
+const BACKUP_VERSION = 1;
 
 export function listSavedPlans() {
   return readSavedPlans().sort((a, b) => b.savedAt.localeCompare(a.savedAt));
@@ -51,6 +52,26 @@ export function deleteSavedPlan(savedPlanId) {
   }
 
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPlans));
+}
+
+export function createSavedPlansBackup() {
+  return {
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    savedPlans: listSavedPlans(),
+  };
+}
+
+export function restoreSavedPlansBackup(backup) {
+  if (!backup || typeof backup !== 'object' || backup.version !== BACKUP_VERSION) {
+    throw new Error('Backup format is not supported.');
+  }
+
+  if (!Array.isArray(backup.savedPlans) || !backup.savedPlans.every(isSavedPlan)) {
+    throw new Error('Backup does not contain valid saved plans.');
+  }
+
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(backup.savedPlans));
 }
 
 function readSavedPlans() {

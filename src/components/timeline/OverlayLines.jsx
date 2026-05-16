@@ -1,4 +1,5 @@
 import { LEFT_COLUMN_WIDTH } from './layout.js';
+import { getDependencyEndpoint, getDependencyEntityName, getEntityTasks } from '../../utils/dependencies.js';
 
 export default function OverlayLines({ document, weekColumnWidth }) {
   const weeks = document.weeks ?? [];
@@ -7,7 +8,8 @@ export default function OverlayLines({ document, weekColumnWidth }) {
   }
 
   const todayPosition = findTodayPosition(weeks);
-  const dependencyMarkers = createDependencyMarkers(document);
+  const dependencyMarkers =
+    document.plan?.showInternalDependencyLines === false ? [] : createDependencyMarkers(document);
   const externalDependencyMarkers = createExternalDependencyMarkers(document);
 
   return (
@@ -53,7 +55,7 @@ function Marker({ index, weekColumnWidth, color, label, solid = false, widthClas
     <div className="absolute top-0 h-full" style={{ left }}>
       <div className={`h-full ${widthClass} ${color} ${solid ? '' : 'opacity-70'}`} />
       {label ? (
-        <div className="absolute left-1 top-2 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 shadow-panel">
+        <div className="absolute left-1 top-2 whitespace-nowrap rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-slate-700 shadow-panel">
           {label}
         </div>
       ) : null}
@@ -95,7 +97,6 @@ function findTodayPosition(weeks) {
 }
 
 function createDependencyMarkers(document) {
-  const taskById = new Map(document.tasks.map((task) => [task.id, task]));
   const firstScheduleWeekByTask = new Map();
 
   for (const entry of document.schedule ?? []) {
@@ -107,22 +108,32 @@ function createDependencyMarkers(document) {
 
   return (document.dependencies ?? [])
     .map((dependency) => {
-      const handoffWeek = firstScheduleWeekByTask.get(dependency.successorId);
+      const successor = getDependencyEndpoint(document, dependency, 'successor');
+      const successorTasks = getEntityTasks(document.tasks ?? [], document.categories ?? [], successor.type, successor.id);
+      const handoffWeek = successorTasks
+        .map((task) => firstScheduleWeekByTask.get(task.id))
+        .filter((weekIndex) => weekIndex !== undefined)
+        .sort((a, b) => a - b)[0];
       const index = document.weeks.findIndex((week) => week.weekIndex === handoffWeek);
       if (index === -1) {
         return null;
       }
 
-      const predecessor = taskById.get(dependency.predecessorId)?.name ?? 'Missing task';
-      const successor = taskById.get(dependency.successorId)?.name ?? 'Missing task';
+      const predecessor = getDependencyEndpoint(document, dependency, 'predecessor');
 
       return {
         key: dependency.id,
         index,
-        label: `${predecessor} to ${successor}${dependency.lagWeeks ? ` +${dependency.lagWeeks}` : ''}`,
+        label: `${formatEndpointLabel(document, predecessor)} → ${formatEndpointLabel(document, successor)}${
+          dependency.lagWeeks ? ` +${dependency.lagWeeks}` : ''
+        }`,
       };
     })
     .filter(Boolean);
+}
+
+function formatEndpointLabel(document, endpoint) {
+  return getDependencyEntityName(document, endpoint.type, endpoint.id);
 }
 
 function createExternalDependencyMarkers(document) {
