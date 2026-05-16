@@ -49,6 +49,7 @@ export function buildDependencyGraph(tasks = [], dependencies = [], categories =
 
 export function topologicalSort(tasks = [], dependencies = [], categories = []) {
   const { incoming, outgoing } = buildDependencyGraph(tasks, dependencies, categories);
+  const taskOrder = new Map(tasks.map((task, index) => [task.id, index]));
   const queue = tasks.filter((task) => incoming.get(task.id).size === 0).map((task) => task.id);
   const sortedIds = [];
 
@@ -60,6 +61,7 @@ export function topologicalSort(tasks = [], dependencies = [], categories = []) 
       incoming.get(nextId).delete(id);
       if (incoming.get(nextId).size === 0) {
         queue.push(nextId);
+        queue.sort((leftId, rightId) => (taskOrder.get(leftId) ?? 0) - (taskOrder.get(rightId) ?? 0));
       }
     }
   }

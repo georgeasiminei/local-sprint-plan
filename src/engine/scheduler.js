@@ -72,7 +72,7 @@ export function recalculateSchedule(document) {
     }
 
     const earliestStartWeek = getEarliestStartWeek(task, dependenciesBySuccessor, completionWeekByTask, startWeek);
-    const result = scheduleTask({
+    const scheduleOptions = {
       task,
       weeks,
       firstTeam,
@@ -85,12 +85,13 @@ export function recalculateSchedule(document) {
       earliestStartWeek,
       manualEntries: manualEntriesByTask.get(task.id) ?? [],
       warnings,
-    });
+    };
+    let result = scheduleTask(scheduleOptions);
 
     while (result.needsMoreWeeks && requiredWeekCount < MAX_CALCULATED_WEEKS) {
       requiredWeekCount = Math.min(MAX_CALCULATED_WEEKS, Math.max(requiredWeekCount + 4, result.requiredWeekCount));
       weeks = buildCalculatedWeeks(startWeek, requiredWeekCount, startYear);
-      result.retry(weeks);
+      result = scheduleTask({ ...scheduleOptions, weeks });
     }
 
     schedule.push(...result.entries);
@@ -147,11 +148,6 @@ function scheduleTask(options) {
     needsMoreWeeks: false,
     remainingEstimate: Math.max(0, roundAllocation((options.task.estimateWeeks ?? 0) - manualTotal)),
     requiredWeekCount: options.weeks.length,
-  };
-
-  state.retry = (weeks) => {
-    const retried = scheduleTask({ ...options, weeks });
-    Object.assign(state, retried);
   };
 
   if (!options.task || state.remainingEstimate <= 0) {
