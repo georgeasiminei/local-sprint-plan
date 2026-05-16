@@ -1,5 +1,10 @@
 import { createId } from '../utils/uuid.js';
 import { shiftTasks } from '../engine/shiftTasks.js';
+import {
+  clearTaskCompletion,
+  freezeTaskFromSchedule,
+  isTaskCompletionAvailable,
+} from '../engine/taskCompletion.js';
 
 export function createTasksSlice(set, get) {
   return {
@@ -43,11 +48,37 @@ export function createTasksSlice(set, get) {
       updateDocument(get, {
         tasks: (tasks) => tasks.map((task) => (task.id === taskId ? { ...task, ...patch } : task)),
       }),
+    setTaskCompleted: (taskId, completed) =>
+      get().updateActiveDocument((document) => ({
+        ...document,
+        tasks: document.tasks.map((task) => {
+          if (task.id !== taskId) {
+            return task;
+          }
+
+          if (!completed) {
+            return clearTaskCompletion(task);
+          }
+
+          if (!isTaskCompletionAvailable(document, taskId)) {
+            return task;
+          }
+
+          return freezeTaskFromSchedule(task, document.schedule);
+        }),
+        schedule: completed
+          ? document.schedule.filter((entry) => !(entry.taskId === taskId && entry.isManual))
+          : document.schedule,
+      })),
     removeTask: (taskId) =>
       updateDocument(get, {
         tasks: (tasks) => tasks.filter((task) => task.id !== taskId),
         dependencies: (dependencies) =>
-          dependencies.filter((item) => item.predecessorId !== taskId && item.successorId !== taskId),
+          dependencies.filter(
+            (item) =>
+              !((item.predecessorType ?? 'task') === 'task' && item.predecessorId === taskId) &&
+              !((item.successorType ?? 'task') === 'task' && item.successorId === taskId),
+          ),
         schedule: (schedule) => schedule.filter((item) => item.taskId !== taskId),
       }),
     bulkShiftTasks: (taskIds, weekDelta) =>

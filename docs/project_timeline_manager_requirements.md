@@ -63,6 +63,7 @@ The app has one active plan. Runtime state uses a full document for rendering an
   "startingResourceCount": 5,
   "rowHeight": 19,
   "weekColumnWidth": 48,
+  "showInternalDependencyLines": true,
   "vacations": [
     { "weekIndex": 21, "dayCount": 10 }
   ],
@@ -102,20 +103,29 @@ Category vacation days are person-days. They reduce effective scheduling capacit
   "maxResources": null,         // max number of resources that can work on this task in any single week; null = no limit
   "resourceOverrides": [
     { "weekIndex": 21, "allocatedUnits": 3 }
+  ],
+  "completed": true,
+  "completedIntervals": [
+    { "startWeek": 21, "endWeek": 23, "allocatedUnits": 3 }
   ]
 }
 ```
 Resource overrides are source rules. Setting a task cell to `x` resources at a week applies `x` from that week onward until another rule is set, and the scheduler regenerates the computed schedule from those rules.
+Completed tasks are historical freezes. Once a task is completed, the app persists only compact run-length-style `completedIntervals` for its actual resource history and does not reschedule those rows later. If a timeline change makes the task future work again, the completion fields are removed so the URL stays compact.
 
 ### 3.5 Dependencies
 ```json
 {
   "id": "d1",
-  "predecessorId": "task id",
-  "successorId": "task id",
+  "predecessorType": "task | category",
+  "predecessorId": "task or category id",
+  "successorType": "task | category",
+  "successorId": "task or category id",
   "lagWeeks": 0    // optional buffer (in weeks) after predecessor ends before successor can start
 }
 ```
+
+Category endpoints expand into task-level scheduling rules at runtime. A task waiting on a category waits for every task in that category; a category waiting on a task applies that wait to every task in the category; category-to-category dependencies apply both rules together.
 
 ### 3.6 External Dependencies
 ```json
@@ -215,11 +225,13 @@ Working days default to 5. The runtime stores non-working day entries so a week 
 8. **Task resource rules:** A task resource override applies from its `weekIndex` onward and limits that task's weekly allocation until the task completes or another override starts.
 9. **`calcWeeks`** is updated after scheduling: `estimateWeeks / avgResourcesUsed`
 10. **Manual overrides** (`isManual: true`) are locked — the engine distributes the remaining unscheduled portion of the task around them.
+11. **Completed task history** is locked. Completed tasks reuse their saved compact resource intervals instead of being recalculated.
 
 ### 4.2 Recalculation Triggers
 The schedule is fully recomputed (in-memory, synchronously) whenever:
 - A task is added, removed, or edited (estimate, priority, earliestStartWeek)
 - A task resource rule is added, removed, or edited
+- A task is marked completed or restored to editable work
 - A dependency is added or removed
 - An external dependency marker is added, removed, or edited
 - Resource count changes for any week
@@ -252,27 +264,30 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - **Row grouping:** Categories render as merged left-column cells spanning the visible task rows in that category, similar to merged spreadsheet cells. This avoids a separate category header row and keeps the table vertically compact.
 - **Task color:** Category and/or task colors are applied only to task cells where resources are allocated, not to the full row. A task created while a category is selected inherits that category and color by default.
 - **Today marker:** A thin blue vertical line spanning the full grid height is drawn at the current date's fractional position within the current ISO week, not snapped to a week boundary. The today marker updates automatically each time the app is opened. If the current date is outside the plan's week range, the marker is not shown.
-- **Dependency markers:** Vertical lines drawn on the timeline grid at the week boundary where a dependency handoff occurs (i.e., the week column where the successor task is allowed to start). The line spans the full vertical height of the grid (all task rows). Each dependency line is color-coded or labeled and shows a tooltip on hover listing: predecessor task name, successor task name, and lag (if any). Multiple dependencies at the same week column are stacked/merged into one line with a combined tooltip. Dependency lines are rendered as an SVG overlay on top of the grid, not inside individual cells.
+- **Dependency markers:** Vertical lines drawn on the timeline grid at the week boundary where a dependency handoff occurs (i.e., the week column where the successor task is allowed to start). The line spans the full vertical height of the grid (all task rows). Each dependency line is color-coded or labeled and shows the compact relation `Predecessor → Successor` with lag when present. Multiple dependencies at the same week column are stacked/merged into one line with a combined tooltip. Dependency lines are rendered as an SVG overlay on top of the grid, not inside individual cells, and can be shown or hidden from plan settings.
 - **Week panel access:** Clicking a week header or a total-effort cell opens the focused week panel for that ISO week.
 - **Total effort row:** Displayed below task rows. Each week shows `x/y`, where `x` is calculated assigned effort for that week and `y` is raw resource capacity for that week.
-- **External dependency markers:** Expected external inputs are rendered as full-height deadline lines on the border after the due week. These lines use red/neutral/green status colors and are visually distinct from the thin blue today line. Free-text boxes are displayed in a dedicated dependency lane below the task table so they do not cover schedule cells. Boxes on the left show `->`, boxes on the right show `<-`, same-week dependencies alternate sides and stack vertically, and edge boxes choose the visible side / shrink as needed instead of escaping the scrollable timeline.
+- **External dependency markers:** Expected external inputs are rendered as full-height deadline lines on the border after the due week. These lines use red/neutral/green status colors and are visually distinct from the thin blue today line. Free-text boxes are displayed in a dedicated dependency lane below the task table so they do not cover schedule cells. Where space allows, same-week dependency boxes are centered on the deadline line and stack vertically; near edges they may fall to the available side / shrink as needed instead of escaping the scrollable timeline. Compact boxes may truncate long text, with the full note shown on hover.
 - **Category totals:** The merged category cell shows compact category summary values; task-week resource totals remain visible in task cells and the total effort row.
-- **Compact toolbar:** The timeline has one compact top toolbar with `Task`, `Category`, `Dependency`, shift, CSV export, `Save`, `Save as`, `Load`, and settings actions. Save/load tooltips clarify that they use local storage.
+- **Compact toolbar:** The timeline has one compact top toolbar with `Task`, `Category`, `Dependency`, shift, CSV export, `Save`, `Save as`, `Load`, `Backup/restore`, and settings actions. Save/load tooltips clarify that they use local storage, and the header links back to the original GitHub repository.
 - **Focused side panel:** Clicking a task, category, dependency box, or add action opens a small right-side panel only for that item type. The panel has an `X` close control and a delete action.
 - **Keyboard delete:** With a task, category, or dependency selected, Delete removes it. If the deletion affects historical schedule/deadline data, the past-week confirmation appears before mutation.
 - **Past-week warning:** Mutating week-scoped values for weeks whose `endDate` is before today opens a confirmation modal before applying changes.
+- **Completed task styling:** Completed tasks remain visible in the grid with a subtle italic task label and a small check icon, so frozen historical work is recognizable without opening the side panel.
 
 ### 5.2 Task Detail Side Panel
 - Opens on row click
 - Can be closed to maximize horizontal timeline space
-- Fields: name, category, priority, estimate, notes, highlight color, earliestStartWeek, maxResources (numeric input; empty = no limit)
+- Fields: name, category, priority, estimate, notes, highlight color, earliestStartWeek, maxResources (numeric input; empty = no limit), plus a `Completed` checkbox whenever the task is historical or currently in its final execution week
 - Dependencies list (incoming + outgoing) with add/remove controls
 - Per-week allocation table (override individual weeks)
+- Marking a task completed freezes its historical resource intervals. Tasks older than three weeks are auto-completed on load; if a timeframe change moves them back into the future, the completion control and frozen data are removed.
 
 ### 5.3 Plan Settings Panel
 - **Timeline start:** Edit ISO start year and ISO start week.
 - **Row height:** Edit fixed timeline row height in pixels.
 - **Week width:** Edit fixed timeline week-column width in pixels.
+- **Internal dependency lines:** Toggle whether internal dependency handoff markers are drawn on the timeline.
 
 ### 5.4 Week Detail Panel
 - Opens when clicking a week header or total-effort cell.
@@ -286,11 +301,12 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 ### 5.5 Dependency Manager
 - Adding a dependency first asks whether it is an external deadline marker or an internal task-to-task dependency.
 - Table of all dependencies: Predecessor → Successor, Lag
-- Add new dependency (select tasks from dropdowns)
+- Add new dependency using clearly separated task/category selectors for both predecessor and successor endpoints
 - Remove existing dependency
 - Add, edit, move, and remove external dependency deadline markers by ISO due week label such as `26.12`.
 - External dependency status cycles through No, Partially, and Yes via a checkbox-style control.
 - Circular dependency detection: warn and block if a cycle would be created
+- Task and category rows expose a compact internal-dependency indicator; clicking it opens the right panel list for that item so internal dependencies can be reviewed and edited after creation
 
 ### 5.6 Bulk Shift Modal
 - Trigger: select tasks via checkboxes (or select all in a category) → "Shift" button
@@ -307,6 +323,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - `Save` writes the current plan to the current named local snapshot, prompting for a name when needed.
 - `Save as` always prompts for a snapshot name.
 - `Load` lists named plans stored in browser `localStorage` and replaces the active plan after selection.
+- `Backup/restore` can download one JSON backup containing all locally saved named plans and restore that backup later. Restore warns that it overwrites every locally saved plan in the current browser; restored plans then appear in `Load`.
 - New task/category starter names and the default local-save name are selected on focus so typing replaces them immediately.
 
 ### 5.8 URL State Indicator
@@ -322,7 +339,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - Payload format is whichever is shortest among the final URL-safe forms `j.<encodeURIComponent(JSON.stringify(compactDocument))>`, `b.<encodeURIComponent(base91(JSON bytes))>`, and `d.<encodeURIComponent(base91(deflate-raw(JSON bytes)))>`.
 - Base91 uses a URL-fragment-safe alphabet that excludes `%` so browser percent-escaping can be decoded without ambiguity.
 - Everything after the first `#` is treated as the payload; no key prefix such as `p=` is used.
-- Store only source data needed to reconstruct the plan: plan settings and plan vacation days, categories and category vacation days, tasks, dependencies, external dependencies, teams, resource overrides, working-day adjustments, week resources, and manual allocation overrides.
+- Store only source data needed to reconstruct the plan: plan settings and plan vacation days, categories and category vacation days, tasks, dependencies, external dependencies, teams, resource overrides, compact completed-task intervals, working-day adjustments, week resources, and manual allocation overrides.
 - The compact document is a positional array schema, not a human-readable object schema. It uses implicit IDs from row order, numeric cross-references, palette indexes for built-in colors, numeric external-dependency status codes, and omitted defaults.
 - Do not store generated weeks, generated sprints, computed schedule rows, timestamps, or long UUIDs.
 - Runtime short IDs such as `p1`, `c1`, `t1`, `d1`, and `team1` are regenerated from row order on load rather than persisted in the URL.

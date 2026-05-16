@@ -1,5 +1,6 @@
 import {
   Braces,
+  DatabaseBackup,
   FileSpreadsheet,
   FolderOpen,
   FolderPlus,
@@ -28,13 +29,22 @@ import WeekDetailPanel from '../components/panels/WeekDetailPanel.jsx';
 import PastWeekEditModal from '../components/panels/PastWeekEditModal.jsx';
 import SavePlanModal from '../components/panels/SavePlanModal.jsx';
 import LoadPlanModal from '../components/panels/LoadPlanModal.jsx';
-import { deleteSavedPlan, listSavedPlans, loadSavedPlan, savePlanSnapshot } from '../persistence/savedPlans.js';
+import BackupRestoreModal from '../components/panels/BackupRestoreModal.jsx';
+import {
+  createSavedPlansBackup,
+  deleteSavedPlan,
+  listSavedPlans,
+  loadSavedPlan,
+  restoreSavedPlansBackup,
+  savePlanSnapshot,
+} from '../persistence/savedPlans.js';
 
 export default function PlanView() {
   useSchedule();
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState(false);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
+  const [isBackupRestoreModalOpen, setIsBackupRestoreModalOpen] = useState(false);
   const [savedPlans, setSavedPlans] = useState(() => listSavedPlans());
   const document = useTimelineStore((state) => state.getActiveDocument());
   const addCategory = useTimelineStore((state) => state.addCategory);
@@ -150,6 +160,23 @@ export default function PlanView() {
     }
   }
 
+  function downloadSavedPlansBackup() {
+    const today = new Date().toISOString().slice(0, 10);
+    downloadJson(`local-sprint-plan-backup-${today}.json`, JSON.stringify(createSavedPlansBackup()));
+  }
+
+  async function restoreSavedPlansFromFile(file) {
+    try {
+      const backup = JSON.parse(await readFileText(file));
+      restoreSavedPlansBackup(backup);
+      setSavedPlans(listSavedPlans());
+      setSavedPlan({ id: null, name: null });
+      setIsBackupRestoreModalOpen(false);
+    } catch (error) {
+      setImportError(`Could not restore backup. ${error.message}`);
+    }
+  }
+
   return (
     <div className={isSidebarOpen ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]' : 'grid gap-4'}>
       <section className="min-w-0 rounded border border-line bg-white shadow-panel">
@@ -161,6 +188,17 @@ export default function PlanView() {
             <div className="truncate text-[11px] text-slate-500">
               {document.tasks.length} tasks · {document.categories.length} categories ·{' '}
               {importError ? `URL state error: ${importError}` : saveStatus}
+            </div>
+            <div className="truncate text-[11px] text-slate-500">
+              Original code:{' '}
+              <a
+                className="underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
+                href="https://github.com/zupermann/local-sprint-plan"
+                target="_blank"
+                rel="noreferrer"
+              >
+                zupermann/local-sprint-plan
+              </a>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -190,6 +228,15 @@ export default function PlanView() {
               tooltip="Load from local storage or JSON file"
             >
               <FolderOpen size={28} />
+            </Button>
+            <Button
+              variant="ghost"
+              className="size-11 p-0"
+              onClick={() => setIsBackupRestoreModalOpen(true)}
+              aria-label="Backup/restore"
+              tooltip="Backup or restore all saved plans"
+            >
+              <DatabaseBackup size={28} />
             </Button>
             <Button
               variant="ghost"
@@ -289,6 +336,13 @@ export default function PlanView() {
         onLoad={loadNamedPlan}
         onLoadJsonFile={loadJsonFile}
         savedPlans={savedPlans}
+      />
+      <BackupRestoreModal
+        open={isBackupRestoreModalOpen}
+        onClose={() => setIsBackupRestoreModalOpen(false)}
+        onDownload={downloadSavedPlansBackup}
+        onRestore={restoreSavedPlansFromFile}
+        savedPlanCount={savedPlans.length}
       />
     </div>
   );

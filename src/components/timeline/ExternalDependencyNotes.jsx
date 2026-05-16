@@ -2,6 +2,7 @@ import { useTimelineStore } from '../../store/index.js';
 import { CATEGORY_COLUMN_WIDTH, TASK_COLUMN_WIDTH } from './layout.js';
 
 const NOTE_BOX_WIDTH = 224;
+const MIN_CENTERED_BOX_WIDTH = 120;
 
 export default function ExternalDependencyNotes({ document, weekColumnWidth }) {
   const selectExternalDependency = useTimelineStore((state) => state.selectExternalDependency);
@@ -33,14 +34,15 @@ export default function ExternalDependencyNotes({ document, weekColumnWidth }) {
               <button
                 key={box.key}
                 type="button"
-                className={`app-tooltip absolute whitespace-pre-line break-words rounded border px-2 py-1.5 text-[11px] shadow-panel transition hover:brightness-95 ${
+                className={`app-tooltip !absolute truncate rounded border px-2 py-1.5 text-[11px] shadow-panel transition hover:brightness-95 ${
                   box.className
-                } ${box.side === 'left' ? 'right-2 text-right' : 'left-2 text-left'}`}
-                data-tooltip="Open external dependency"
-                style={{ top: `${12 + box.stack * 46}px`, width: box.width }}
+                } ${getBoxTextAlignmentClass(box.side)}`}
+                data-tooltip={box.text}
+                title={box.text}
+                style={{ top: `${12 + box.stack * 34}px`, width: box.width, ...getBoxPositionStyle(box) }}
                 onClick={() => selectExternalDependency(box.id)}
               >
-                {box.side === 'left' ? `${box.text} ->` : `<- ${box.text}`}
+                {getBoxLabel(box)}
               </button>
             ))}
           </div>
@@ -77,20 +79,18 @@ function createExternalDependencyNoteMarkers(document, weekColumnWidth) {
         key: `external-notes-${dueWeek}`,
         left: `${lineIndex * weekColumnWidth}px`,
         boxes: dependencies.map((dependency, index) => {
-          const side = chooseBoxSide({
-            index,
+          const placement = getBoxPlacement({
             lineIndex,
             weekCount,
             weekColumnWidth,
           });
-          const width = getBoxWidth({ side, lineIndex, weekCount, weekColumnWidth });
           const style = getExternalDependencyStyle(dependency.status);
           return {
             id: dependency.id,
             key: dependency.id,
-            side,
-            width,
-            stack: Math.floor(index / 2),
+            side: placement.side,
+            width: placement.width,
+            stack: index,
             text: dependency.notes || dependency.name,
             className: style.boxClass,
           };
@@ -100,33 +100,44 @@ function createExternalDependencyNoteMarkers(document, weekColumnWidth) {
     .filter(Boolean);
 }
 
-function chooseBoxSide({ index, lineIndex, weekCount, weekColumnWidth }) {
-  const weeksNeeded = Math.ceil(NOTE_BOX_WIDTH / weekColumnWidth);
-  const hasRoomOnLeft = lineIndex >= weeksNeeded;
-  const hasRoomOnRight = weekCount - lineIndex >= weeksNeeded;
+function getBoxPlacement({ lineIndex, weekCount, weekColumnWidth }) {
+  const leftSpace = lineIndex * weekColumnWidth;
+  const rightSpace = (weekCount - lineIndex) * weekColumnWidth;
+  const centeredWidth = Math.min(NOTE_BOX_WIDTH, Math.max(0, 2 * Math.min(leftSpace, rightSpace) - 16));
 
-  if (!hasRoomOnLeft && hasRoomOnRight) {
-    return 'right';
+  if (centeredWidth >= MIN_CENTERED_BOX_WIDTH) {
+    return { side: 'center', width: centeredWidth };
   }
 
-  if (hasRoomOnLeft && !hasRoomOnRight) {
-    return 'left';
+  if (leftSpace >= rightSpace) {
+    return { side: 'left', width: Math.max(32, Math.min(NOTE_BOX_WIDTH, leftSpace - 16)) };
   }
 
-  if (!hasRoomOnLeft && !hasRoomOnRight) {
-    return lineIndex >= weekCount - lineIndex ? 'left' : 'right';
-  }
-
-  return index % 2 === 0 ? 'left' : 'right';
+  return { side: 'right', width: Math.max(32, Math.min(NOTE_BOX_WIDTH, rightSpace - 16)) };
 }
 
-function getBoxWidth({ side, lineIndex, weekCount, weekColumnWidth }) {
-  const availableWidth =
-    side === 'left'
-      ? lineIndex * weekColumnWidth - 16
-      : (weekCount - lineIndex) * weekColumnWidth - 16;
+function getBoxTextAlignmentClass(side) {
+  if (side === 'center') {
+    return 'text-center';
+  }
 
-  return Math.max(32, Math.min(NOTE_BOX_WIDTH, availableWidth));
+  return side === 'left' ? 'text-right' : 'text-left';
+}
+
+function getBoxPositionStyle(box) {
+  if (box.side === 'center') {
+    return { left: `${-box.width / 2}px` };
+  }
+
+  return box.side === 'left' ? { right: '8px' } : { left: '8px' };
+}
+
+function getBoxLabel(box) {
+  if (box.side === 'center') {
+    return box.text;
+  }
+
+  return box.side === 'left' ? `${box.text} ->` : `<- ${box.text}`;
 }
 
 function getExternalDependencyStyle(status) {

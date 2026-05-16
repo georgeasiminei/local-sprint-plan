@@ -16,6 +16,7 @@ export function createPlanFixture(overrides = {}) {
       startingResourceCount: 5,
       rowHeight: 19,
       weekColumnWidth: 48,
+      showInternalDependencyLines: true,
       vacations: [],
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',

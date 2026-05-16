@@ -60,6 +60,13 @@ export function validatePlanDocument(document) {
     errors.push('Plan weekColumnWidth must be between 24 and 120.');
   }
 
+  if (
+    document.plan?.showInternalDependencyLines !== undefined &&
+    typeof document.plan.showInternalDependencyLines !== 'boolean'
+  ) {
+    errors.push('Plan showInternalDependencyLines must be a boolean.');
+  }
+
   for (const key of ROOT_ARRAY_KEYS) {
     if (!Array.isArray(document[key])) {
       errors.push(`${key} must be an array.`);
@@ -86,7 +93,7 @@ export function validatePlanDocument(document) {
   const weekIndexes = new Set(document.weeks.map((week) => week.weekIndex));
 
   validateTasks(document.tasks, categoryIds, errors);
-  validateDependencies(document.dependencies, taskIds, errors);
+  validateDependencies(document.dependencies, taskIds, categoryIds, errors);
   validateExternalDependencies(document.externalDependencies, errors);
   validateWeeks(document.weeks, errors);
   validateSprints(document.sprints, weekIndexes, errors);
@@ -151,27 +158,64 @@ function validateTasks(tasks, categoryIds, errors) {
         errors.push(`Task ${task.id} resource override allocatedUnits must be a non-negative number.`);
       }
     }
+
+    if (task.completed !== undefined && typeof task.completed !== 'boolean') {
+      errors.push(`Task ${task.id} completed must be a boolean.`);
+    }
+
+    for (const interval of task.completedIntervals ?? []) {
+      if (!isIntegerAtLeast(interval.startWeek, 1)) {
+        errors.push(`Task ${task.id} completed interval startWeek must be a positive integer.`);
+      }
+
+      if (!isIntegerAtLeast(interval.endWeek, interval.startWeek ?? 1)) {
+        errors.push(`Task ${task.id} completed interval endWeek must be on or after startWeek.`);
+      }
+
+      if (!isNumberAtLeast(interval.allocatedUnits, 0)) {
+        errors.push(`Task ${task.id} completed interval allocatedUnits must be a non-negative number.`);
+      }
+    }
   }
 }
 
-function validateDependencies(dependencies, taskIds, errors) {
+function validateDependencies(dependencies, taskIds, categoryIds, errors) {
   for (const dependency of dependencies) {
-    if (!taskIds.has(dependency.predecessorId)) {
-      errors.push(`Dependency ${dependency.id} references a missing predecessor task.`);
+    const predecessorType = dependency.predecessorType ?? 'task';
+    const successorType = dependency.successorType ?? 'task';
+
+    if (!isKnownDependencyType(predecessorType)) {
+      errors.push(`Dependency ${dependency.id} predecessorType must be task or category.`);
     }
 
-    if (!taskIds.has(dependency.successorId)) {
-      errors.push(`Dependency ${dependency.id} references a missing successor task.`);
+    if (!isKnownDependencyType(successorType)) {
+      errors.push(`Dependency ${dependency.id} successorType must be task or category.`);
     }
 
-    if (dependency.predecessorId === dependency.successorId) {
-      errors.push(`Dependency ${dependency.id} cannot point a task at itself.`);
+    if (!hasEntity(predecessorType, dependency.predecessorId, taskIds, categoryIds)) {
+      errors.push(`Dependency ${dependency.id} references a missing predecessor ${predecessorType ?? 'entity'}.`);
+    }
+
+    if (!hasEntity(successorType, dependency.successorId, taskIds, categoryIds)) {
+      errors.push(`Dependency ${dependency.id} references a missing successor ${successorType ?? 'entity'}.`);
+    }
+
+    if (predecessorType === successorType && dependency.predecessorId === dependency.successorId) {
+      errors.push(`Dependency ${dependency.id} cannot point an item at itself.`);
     }
 
     if (dependency.lagWeeks !== undefined && !isNumberAtLeast(dependency.lagWeeks, 0)) {
       errors.push(`Dependency ${dependency.id} lagWeeks must be a non-negative number.`);
     }
   }
+}
+
+function hasEntity(type, id, taskIds, categoryIds) {
+  return type === 'category' ? categoryIds.has(id) : taskIds.has(id);
+}
+
+function isKnownDependencyType(type) {
+  return type === 'task' || type === 'category';
 }
 
 function validateExternalDependencies(externalDependencies, errors) {

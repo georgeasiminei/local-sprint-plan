@@ -23,6 +23,7 @@ describe('URL plan payloads', () => {
         sprintStartOrder: 2,
         startingResourceCount: 1,
         weekColumnWidth: 36,
+        showInternalDependencyLines: false,
         vacations: [{ weekIndex: 4, dayCount: 10 }],
       },
       categories: [
@@ -77,7 +78,7 @@ describe('URL plan payloads', () => {
     expect(compactJson).not.toContain('sprints');
     expect(compactJson).not.toContain('schedule');
     expect(compactJson).not.toContain('48bf67a1');
-    expect(compact[0]).toEqual(['Plan1', null, 2027, null, 10, 2, 1, null, [[4, 10]], 36]);
+    expect(compact[0]).toEqual(['Plan1', null, 2027, null, 10, 2, 1, null, [[4, 10]], 36, 0]);
     expect(compact[1][0]).toEqual(['OBI', null, 0, null, [[3, 5]]]);
     expect(compact[2][0]).toEqual([0, null, null, 45, null, null, null, null, [[3, 2]]]);
     expect(compact[4][0]).toEqual(['Client input', 7, 1, 'Client input\nTest env']);
@@ -87,7 +88,7 @@ describe('URL plan payloads', () => {
 
   it('expands compact state into a valid runtime document and regenerates derived schedule data', () => {
     const compact = [
-      ['URL plan', null, 2027, null, 10, 2, 1, null, [[3, 6]], 36],
+      ['URL plan', null, 2027, null, 10, 2, 1, null, [[3, 6]], 36, 0],
       [['Delivery', null, null, null, [[2, 4]]]],
       [[0, 'Implementation', null, 3, null, null, null, null, [[2, 1]]]],
       undefined,
@@ -103,7 +104,13 @@ describe('URL plan payloads', () => {
     expect(document.weeks).toHaveLength(4);
     expect(document.sprints).toHaveLength(2);
     expect(document.weeks[0].label).toBe('27.01');
-    expect(document.plan).toMatchObject({ startYear: 2027, sprintStartNumber: 10, sprintStartOrder: 2, weekColumnWidth: 36 });
+    expect(document.plan).toMatchObject({
+      startYear: 2027,
+      sprintStartNumber: 10,
+      sprintStartOrder: 2,
+      weekColumnWidth: 36,
+      showInternalDependencyLines: false,
+    });
     expect(document.plan.vacations).toEqual([{ weekIndex: 3, dayCount: 6 }]);
     expect(document.categories[0].vacations).toEqual([{ weekIndex: 2, dayCount: 4 }]);
     expect(document.sprints.map((sprint) => sprint.name)).toEqual(['Sprint 1', 'Sprint 10']);
@@ -152,6 +159,71 @@ describe('URL plan payloads', () => {
     expect(decoded.tasks[0].id).toBe('t1');
     expect(decoded.tasks[0].categoryId).toBe('c1');
     expect(validatePlanDocument(decoded).valid).toBe(true);
+  });
+
+  it('round trips category dependency endpoints in the compact URL format', async () => {
+    const document = createPlanFixture({
+      categories: [
+        { id: 'cat-1', name: 'Foundation', order: 1 },
+        { id: 'cat-2', name: 'Delivery', order: 2 },
+      ],
+      tasks: [{ id: 'task-1', categoryId: 'cat-1', name: 'Implementation', priority: 1, estimateWeeks: 3 }],
+      dependencies: [
+        {
+          id: 'dep-1',
+          predecessorType: 'category',
+          predecessorId: 'cat-1',
+          successorType: 'task',
+          successorId: 'task-1',
+          lagWeeks: 2,
+        },
+      ],
+    });
+
+    const compact = compactPlanDocument(document);
+    const decoded = await decodePlanFromHashPayload(await encodePlanToHashPayload(document));
+
+    expect(compact[3][0]).toEqual([-1, 0, 2]);
+    expect(decoded.dependencies[0]).toMatchObject({
+      predecessorType: 'category',
+      predecessorId: 'c1',
+      successorType: 'task',
+      successorId: 't1',
+      lagWeeks: 2,
+    });
+  });
+
+  it('stores completed task history as compact resource intervals', async () => {
+    const document = createPlanFixture({
+      tasks: [
+        {
+          id: 'task-1',
+          name: 'Historical',
+          priority: 1,
+          estimateWeeks: 4,
+          completed: true,
+          completedIntervals: [
+            { startWeek: 3, endWeek: 5, allocatedUnits: 2 },
+            { startWeek: 6, endWeek: 6, allocatedUnits: 1 },
+          ],
+        },
+      ],
+    });
+
+    const compact = compactPlanDocument(document);
+    const decoded = await decodePlanFromHashPayload(await encodePlanToHashPayload(document));
+
+    expect(compact[2][0][9]).toEqual([
+      [3, 5, 2],
+      [6, 1],
+    ]);
+    expect(decoded.tasks[0]).toMatchObject({
+      completed: true,
+      completedIntervals: [
+        { startWeek: 3, endWeek: 5, allocatedUnits: 2 },
+        { startWeek: 6, endWeek: 6, allocatedUnits: 1 },
+      ],
+    });
   });
 
   it('keeps large encoded plans compact relative to runtime JSON', async () => {

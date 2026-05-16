@@ -58,6 +58,11 @@ export function createCategoriesSlice(set, get) {
         ...document,
         categories: document.categories.filter((category) => category.id !== categoryId),
         tasks: document.tasks.map((task) => (task.categoryId === categoryId ? { ...task, categoryId: null } : task)),
+        dependencies: document.dependencies.filter(
+          (dependency) =>
+            !((dependency.predecessorType ?? 'task') === 'category' && dependency.predecessorId === categoryId) &&
+            !((dependency.successorType ?? 'task') === 'category' && dependency.successorId === categoryId),
+        ),
       })),
     toggleCategory: (categoryId) =>
       get().updateActiveDocument((document) => ({

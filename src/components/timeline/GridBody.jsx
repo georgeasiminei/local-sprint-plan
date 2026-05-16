@@ -12,6 +12,7 @@ export default function GridBody({ document, rowHeight, weekColumnWidth }) {
           <CategoryTaskGroup
             key={category.id}
             category={category}
+            document={document}
             rowHeight={rowHeight}
             schedule={document.schedule}
             tasks={tasks}
@@ -23,6 +24,7 @@ export default function GridBody({ document, rowHeight, weekColumnWidth }) {
       {uncategorizedTasks.length > 0 ? (
         <CategoryTaskGroup
           category={{ id: 'uncategorized', name: 'Uncategorized' }}
+          document={document}
           isSynthetic
           rowHeight={rowHeight}
           schedule={document.schedule}

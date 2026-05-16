@@ -1,37 +1,57 @@
 import { createId } from '../utils/uuid.js';
+import { wouldCreateDependencyCycle } from '../engine/dependencyGraph.js';
 
 export function createDependenciesSlice(set, get) {
   return {
-    addDependency: (predecessorId, successorId, lagWeeks = 0) => {
+    addDependency: (predecessorId, successorId, lagWeeks = 0, predecessorType = 'task', successorType = 'task') => {
       const currentDocument = get().getActiveDocument();
       const id = createId('dependency', (currentDocument?.dependencies ?? []).map((dependency) => dependency.id));
+      let didAdd = false;
 
       get().updateActiveDocument((document) => {
-        if (!predecessorId || !successorId || predecessorId === successorId) {
+        if (
+          !predecessorId ||
+          !successorId ||
+          (predecessorType === successorType && predecessorId === successorId)
+        ) {
           return document;
         }
 
         const exists = document.dependencies.some(
           (dependency) =>
-            dependency.predecessorId === predecessorId && dependency.successorId === successorId,
+            dependency.predecessorId === predecessorId &&
+            dependency.successorId === successorId &&
+            (dependency.predecessorType ?? 'task') === predecessorType &&
+            (dependency.successorType ?? 'task') === successorType,
         );
         if (exists) {
           return document;
         }
 
+        const candidate = {
+          id,
+          predecessorId,
+          predecessorType,
+          successorId,
+          successorType,
+          lagWeeks: Math.max(0, Number(lagWeeks) || 0),
+        };
+
+        if (wouldCreateDependencyCycle(document, candidate)) {
+          return document;
+        }
+
+        didAdd = true;
+
         return {
           ...document,
-          dependencies: [
-            ...document.dependencies,
-            {
-              id,
-              predecessorId,
-              successorId,
-              lagWeeks: Math.max(0, Number(lagWeeks) || 0),
-            },
-          ],
+          dependencies: [...document.dependencies, candidate],
         };
       });
+
+      if (!didAdd) {
+        return null;
+      }
 
       set({
         selectedDependencyId: id,
@@ -46,19 +66,27 @@ export function createDependenciesSlice(set, get) {
       return id;
     },
     updateDependency: (dependencyId, patch) =>
-      get().updateActiveDocument((document) => ({
-        ...document,
-        dependencies: document.dependencies.map((dependency) =>
-          dependency.id === dependencyId
-            ? {
-                ...dependency,
-                ...patch,
-                lagWeeks:
-                  patch.lagWeeks === undefined ? dependency.lagWeeks : Math.max(0, Number(patch.lagWeeks) || 0),
-              }
-            : dependency,
-        ),
-      })),
+      get().updateActiveDocument((document) => {
+        const dependency = document.dependencies.find((item) => item.id === dependencyId);
+        if (!dependency) {
+          return document;
+        }
+
+        const candidate = {
+          ...dependency,
+          ...patch,
+          lagWeeks: patch.lagWeeks === undefined ? dependency.lagWeeks : Math.max(0, Number(patch.lagWeeks) || 0),
+        };
+
+        if (wouldCreateDependencyCycle(document, candidate, dependencyId)) {
+          return document;
+        }
+
+        return {
+          ...document,
+          dependencies: document.dependencies.map((item) => (item.id === dependencyId ? candidate : item)),
+        };
+      }),
     removeDependency: (dependencyId) =>
       get().updateActiveDocument((document) => ({
         ...document,
