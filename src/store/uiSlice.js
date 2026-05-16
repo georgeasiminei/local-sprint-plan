@@ -89,7 +89,6 @@ export function createUiSlice(set, get) {
         selectedExternalDependencyId: null,
         selectedTaskId: null,
         selectedCategoryId: null,
-        selectedWeekIndex: null,
       }),
     openBulkShift: () => set({ isBulkShiftOpen: true }),
     closeBulkShift: () => set({ isBulkShiftOpen: false }),

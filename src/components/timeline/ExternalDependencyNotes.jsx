@@ -67,7 +67,7 @@ function createExternalDependencyNoteMarkers(document, weekColumnWidth) {
     groups.set(dueWeek, items);
   }
 
-  return [...groups.entries()]
+  const markers = [...groups.entries()]
     .map(([dueWeek, dependencies]) => {
       const weekIndex = document.weeks.findIndex((week) => week.weekIndex === dueWeek);
       if (weekIndex === -1) {
@@ -78,7 +78,8 @@ function createExternalDependencyNoteMarkers(document, weekColumnWidth) {
       return {
         key: `external-notes-${dueWeek}`,
         left: `${lineIndex * weekColumnWidth}px`,
-        boxes: dependencies.map((dependency, index) => {
+        lineIndex,
+        boxes: dependencies.map((dependency) => {
           const placement = getBoxPlacement({
             lineIndex,
             weekCount,
@@ -90,7 +91,7 @@ function createExternalDependencyNoteMarkers(document, weekColumnWidth) {
             key: dependency.id,
             side: placement.side,
             width: placement.width,
-            stack: index,
+            stack: 0,
             text: dependency.notes || dependency.name,
             className: style.boxClass,
           };
@@ -98,6 +99,47 @@ function createExternalDependencyNoteMarkers(document, weekColumnWidth) {
       };
     })
     .filter(Boolean);
+
+  assignGlobalBoxStacks(markers, weekColumnWidth);
+  return markers;
+}
+
+function assignGlobalBoxStacks(markers, weekColumnWidth) {
+  const occupiedRangesByStack = [];
+
+  for (const marker of markers) {
+    for (const box of marker.boxes) {
+      const range = getBoxRange(marker.lineIndex, box, weekColumnWidth);
+      let stack = 0;
+
+      while (occupiedRangesByStack[stack]?.some((occupied) => rangesOverlap(range, occupied))) {
+        stack += 1;
+      }
+
+      box.stack = stack;
+      const occupiedRanges = occupiedRangesByStack[stack] ?? [];
+      occupiedRanges.push(range);
+      occupiedRangesByStack[stack] = occupiedRanges;
+    }
+  }
+}
+
+function getBoxRange(lineIndex, box, weekColumnWidth) {
+  const anchor = lineIndex * weekColumnWidth;
+
+  if (box.side === 'center') {
+    return { start: anchor - box.width / 2, end: anchor + box.width / 2 };
+  }
+
+  if (box.side === 'left') {
+    return { start: anchor - 8 - box.width, end: anchor - 8 };
+  }
+
+  return { start: anchor + 8, end: anchor + 8 + box.width };
+}
+
+function rangesOverlap(first, second) {
+  return first.start < second.end && second.start < first.end;
 }
 
 function getBoxPlacement({ lineIndex, weekCount, weekColumnWidth }) {

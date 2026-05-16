@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  base: './',
+  base: '/local-sprint-plan/',
   test: {
     environment: 'jsdom',
     globals: true,

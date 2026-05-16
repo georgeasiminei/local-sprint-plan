@@ -41,7 +41,7 @@ export default function CategoryTaskGroup({
     >
       <div
         className={`sticky left-0 z-[6] overflow-hidden border-r border-line px-2 py-0.5 text-xs font-semibold shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-line ${
-          isSelected ? 'ring-2 ring-focus/40' : ''
+          isSelected ? 'ring-2 ring-focus/60 font-bold' : ''
         }`}
         style={{
           gridRow: `1 / span ${rowCount}`,
@@ -128,13 +128,17 @@ function TaskGridRow({
   toggleTaskSelection,
   weekColumnWidth,
 }) {
+  const selectedTaskId = useTimelineStore((state) => state.selectedTaskId);
+  const isSelected = selectedTaskId === task.id;
   const taskSchedule = schedule.filter((item) => item.taskId === task.id);
   const taskDependencies = getDependenciesForEntity(document, 'task', task.id);
 
   return (
     <>
       <div
-        className="sticky z-[5] grid grid-cols-[30px_1fr_48px_48px] overflow-hidden border-b border-r border-slate-200 bg-white text-left hover:bg-slate-50"
+        className={`sticky z-[5] grid grid-cols-[30px_1fr_48px_48px] overflow-hidden border-b border-r border-slate-200 bg-white text-left hover:bg-slate-50 ${
+          isSelected ? 'ring-2 ring-focus/40 z-[6]' : ''
+        }`}
         style={{
           gridColumn: 2,
           gridRow: row,
@@ -154,7 +158,7 @@ function TaskGridRow({
         <div className="min-w-0 overflow-hidden px-2">
           <div className="flex min-w-0 items-center gap-1">
             <p
-              className={`truncate text-xs font-medium leading-[inherit] ${task.completed ? 'italic text-slate-600' : ''}`}
+              className={`truncate text-xs font-medium leading-[inherit] ${task.completed ? 'italic text-slate-600' : ''} ${isSelected ? 'font-bold' : ''}`}
               style={{ lineHeight: `${rowHeight}px` }}
             >
               {task.name}

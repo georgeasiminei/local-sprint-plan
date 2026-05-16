@@ -277,6 +277,45 @@ describe('URL-owned app state', () => {
     expect(useTimelineStore.getState().getActiveDocument().externalDependencies).toHaveLength(0);
   });
 
+  it('opens the task panel when a task cell is clicked', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    act(() => {
+      useTimelineStore.getState().addTask({ name: 'Cell task' });
+    });
+
+    const document = useTimelineStore.getState().getActiveDocument();
+    const weekLabel = document.weeks[0]?.label;
+
+    await user.click(screen.getByRole('button', { name: `Set Cell task resources in ${weekLabel}` }));
+
+    expect(await screen.findByText('Name')).toBeInTheDocument();
+    expect(screen.getByText('Cell task')).toBeInTheDocument();
+  });
+
+  it('defaults external dependency due week to the selected week', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    const document = useTimelineStore.getState().getActiveDocument();
+    const selectedWeekIndex = document.weeks[2]?.weekIndex ?? document.plan.startWeek;
+    const selectedWeekLabel = document.weeks.find((week) => week.weekIndex === selectedWeekIndex)?.label;
+
+    act(() => {
+      useTimelineStore.getState().selectWeek(selectedWeekIndex);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'New dependency' }));
+
+    expect(await screen.findByText('Add dependency')).toBeInTheDocument();
+    expect(screen.getByLabelText('Due week')).toHaveValue(selectedWeekLabel);
+  });
+
   it('creates and reopens internal dependencies for tasks and categories', async () => {
     const user = userEvent.setup();
 
