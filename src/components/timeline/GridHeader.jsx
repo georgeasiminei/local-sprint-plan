@@ -6,6 +6,7 @@ export default function GridHeader({ weeks = [], sprints = [], weekColumnWidth }
   const [editingSprintId, setEditingSprintId] = useState(null);
   const setSprintNumber = useTimelineStore((state) => state.setSprintNumber);
   const selectWeek = useTimelineStore((state) => state.selectWeek);
+  const selectedWeekIndex = useTimelineStore((state) => state.selectedWeekIndex);
 
   function commitSprint(sprint, value) {
     setEditingSprintId(null);
@@ -78,7 +79,9 @@ export default function GridHeader({ weeks = [], sprints = [], weekColumnWidth }
               <button
                 key={week.id}
                 type="button"
-                className="app-tooltip border-r border-line px-1.5 py-1 text-center text-[11px] font-medium hover:bg-white"
+                className={`app-tooltip border-r border-line px-1.5 py-1 text-center text-[11px] font-medium hover:bg-white ${
+                      selectedWeekIndex === week.weekIndex ? 'bg-white font-bold text-ink ring-1 ring-inset ring-focus/40' : 'text-slate-600'
+                    }`}
                 data-tooltip={`Open ${week.label}`}
                 onClick={() => selectWeek(week.weekIndex)}
               >

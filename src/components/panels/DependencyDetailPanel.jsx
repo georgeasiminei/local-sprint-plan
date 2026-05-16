@@ -32,14 +32,15 @@ export default function DependencyDetailPanel({ document }) {
   const requestWeekEdit = useTimelineStore((state) => state.requestWeekEdit);
   const selectedDependencyId = useTimelineStore((state) => state.selectedDependencyId);
   const selectedExternalDependencyId = useTimelineStore((state) => state.selectedExternalDependencyId);
+  const selectedWeekIndex = useTimelineStore((state) => state.selectedWeekIndex);
   const updateDependency = useTimelineStore((state) => state.updateDependency);
   const updateExternalDependency = useTimelineStore((state) => state.updateExternalDependency);
   const internalDependency = (document.dependencies ?? []).find((item) => item.id === selectedDependencyId);
   const externalDependency = (document.externalDependencies ?? []).find((item) => item.id === selectedExternalDependencyId);
 
   useEffect(() => {
-    setExternalDueWeekLabel(getDefaultDueWeekLabel(document));
-  }, [document.plan?.startWeek, document.plan?.startYear]);
+    setExternalDueWeekLabel(getDefaultDueWeekLabel(document, selectedWeekIndex));
+  }, [document.plan?.startWeek, document.plan?.startYear, selectedWeekIndex]);
 
   if (internalDependency) {
     return (
@@ -85,7 +86,7 @@ export default function DependencyDetailPanel({ document }) {
         status: 'no',
       });
       setExternalText('');
-      setExternalDueWeekLabel(getDefaultDueWeekLabel(document));
+      setExternalDueWeekLabel(getDefaultDueWeekLabel(document, selectedWeekIndex));
     });
   }
 
@@ -406,6 +407,9 @@ function ExternalDependencyEditor({ dependency, document, onDelete, onRequestWee
 function DependencyLists({ document }) {
   const selectDependency = useTimelineStore((state) => state.selectDependency);
   const selectExternalDependency = useTimelineStore((state) => state.selectExternalDependency);
+  const selectedDependencyId = useTimelineStore((state) => state.selectedDependencyId);
+  const selectedExternalDependencyId = useTimelineStore((state) => state.selectedExternalDependencyId);
+
   if ((document.dependencies ?? []).length === 0 && (document.externalDependencies ?? []).length === 0) {
     return null;
   }
@@ -416,7 +420,9 @@ function DependencyLists({ document }) {
         <button
           key={dependency.id}
           type="button"
-          className="app-tooltip w-full rounded border border-line px-3 py-2 text-left text-xs hover:bg-panel"
+          className={`app-tooltip w-full rounded border border-line px-3 py-2 text-left text-xs hover:bg-panel ${
+            selectedDependencyId === dependency.id ? 'bg-panel font-bold border-focus ring-1 ring-focus/40' : ''
+          }`}
           data-tooltip="Open internal dependency"
           onClick={() => selectDependency(dependency.id)}
         >
@@ -428,7 +434,9 @@ function DependencyLists({ document }) {
         <button
           key={dependency.id}
           type="button"
-          className="app-tooltip w-full rounded border border-line px-3 py-2 text-left text-xs hover:bg-panel"
+          className={`app-tooltip w-full rounded border border-line px-3 py-2 text-left text-xs hover:bg-panel ${
+            selectedExternalDependencyId === dependency.id ? 'bg-panel font-bold border-focus ring-1 ring-focus/40' : ''
+          }`}
           data-tooltip="Open external dependency"
           onClick={() => selectExternalDependency(dependency.id)}
         >
@@ -569,7 +577,10 @@ function getWeekByIndex(weeks, weekIndex) {
   return weeks.find((week) => week.weekIndex === weekIndex);
 }
 
-function getDefaultDueWeekLabel(document) {
+function getDefaultDueWeekLabel(document, selectedWeekIndex) {
+  if (selectedWeekIndex !== null && selectedWeekIndex !== undefined) {
+    return getWeekLabelByIndex(document, selectedWeekIndex);
+  }
   return document.weeks[0]?.label ?? getWeekLabelByIndex(document, document.plan?.startWeek ?? 1);
 }
 
