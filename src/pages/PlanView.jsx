@@ -193,11 +193,11 @@ export default function PlanView() {
               Original code:{' '}
               <a
                 className="underline decoration-slate-300 underline-offset-2 hover:text-slate-700"
-                href="https://github.com/zupermann/local-sprint-plan"
+                href="https://github.com/georgeasiminei/local-sprint-plan"
                 target="_blank"
                 rel="noreferrer"
               >
-                zupermann/local-sprint-plan
+                georgeasiminei/local-sprint-plan
               </a>
             </div>
           </div>
