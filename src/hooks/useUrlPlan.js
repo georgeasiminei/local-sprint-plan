@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useTimelineStore } from '../store/index.js';
 import { createPlanDocument } from '../persistence/schema.js';
-import { compactPlanDocument, decodePlanFromHashPayload, encodePlanToHashPayload } from '../persistence/shareUrl.js';
+import {
+  compactPlanDocument,
+  decodePlanFromHashPayload,
+  encodePlanToHashPayload,
+  encodePlanToJsonHashPayload,
+} from '../persistence/shareUrl.js';
 
 export function useUrlPlan() {
   const activeDocument = useTimelineStore((state) => state.getActiveDocument());
@@ -27,7 +32,7 @@ export function useUrlPlan() {
           }
 
           lastPayloadRef.current = payload;
-          window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${payload}`);
+          replaceHashPayload(payload);
           setSaveStatus('url updated');
         } catch (error) {
           setSaveStatus('url error');
@@ -81,6 +86,18 @@ export function useUrlPlan() {
       return;
     }
 
+    try {
+      const immediatePayload = encodePlanToJsonHashPayload(activeDocument);
+      if (immediatePayload !== lastPayloadRef.current) {
+        lastPayloadRef.current = immediatePayload;
+        replaceHashPayload(immediatePayload);
+      }
+    } catch (error) {
+      setSaveStatus('url error');
+      setImportError(error.message);
+      return;
+    }
+
     setSaveStatus('updating url');
     const writeVersion = ++writeVersionRef.current;
     debouncedUrlWrite(activeDocument, writeVersion);
@@ -93,6 +110,10 @@ export function useUrlPlan() {
 
 function readHashPayload() {
   return window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
+}
+
+function replaceHashPayload(payload) {
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${payload}`);
 }
 
 function isPristineCompactDocument(compactDocument) {

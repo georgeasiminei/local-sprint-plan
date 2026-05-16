@@ -39,6 +39,19 @@ export async function encodePlanToHashPayload(planDocument, options = {}) {
   return payload;
 }
 
+export function encodePlanToJsonHashPayload(planDocument, options = {}) {
+  const maxPayloadLength = options.maxPayloadLength ?? SHARE_URL_MAX_PAYLOAD_LENGTH;
+  const payload = `j.${encodeURIComponent(JSON.stringify(compactPlanDocument(planDocument)))}`;
+
+  if (payload.length > maxPayloadLength) {
+    throw new Error(
+      `URL state is too large (${payload.length.toLocaleString()} characters). Reduce plan size before sharing.`,
+    );
+  }
+
+  return payload;
+}
+
 export async function decodePlanFromHashPayload(payload) {
   return expandCompactPlanDocument(await decodeCompactPayload(payload));
 }

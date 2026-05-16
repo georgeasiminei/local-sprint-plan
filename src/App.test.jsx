@@ -79,6 +79,24 @@ describe('URL-owned app state', () => {
     expect(window.location.hash).toBe(writtenHash);
   });
 
+  it('writes a refresh-safe hash immediately after meaningful edits', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    await user.click(screen.getByRole('button', { name: 'New task' }));
+    const writtenHash = window.location.hash;
+    expect(writtenHash).toMatch(/^#j\./);
+
+    cleanup();
+    resetStore();
+    render(<App />);
+
+    expect(await screen.findByText('Task 1')).toBeInTheDocument();
+    expect(window.location.hash).toBe(writtenHash);
+  });
+
   it('adds fast tooltip labels to visible buttons', async () => {
     render(<App />);
     await screen.findByText('Nothing is sent to a server, all data stays in this computer');
@@ -116,6 +134,33 @@ describe('URL-owned app state', () => {
       expect(decoded).not.toHaveProperty('undoStack');
       expect(decoded).not.toHaveProperty('redoStack');
     });
+  });
+
+  it('lets settings dimensions be cleared and typed before committing', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    const rowHeightInput = await screen.findByLabelText('Timeline row height in pixels');
+    const weekWidthInput = screen.getByLabelText('Timeline week column width in pixels');
+
+    await user.clear(rowHeightInput);
+    expect(rowHeightInput).toHaveValue('');
+    await user.type(rowHeightInput, '24');
+    expect(rowHeightInput).toHaveValue('24');
+    await user.tab();
+
+    await user.clear(weekWidthInput);
+    expect(weekWidthInput).toHaveValue('');
+    await user.type(weekWidthInput, '72');
+    expect(weekWidthInput).toHaveValue('72');
+    await user.tab();
+
+    const document = useTimelineStore.getState().getActiveDocument();
+    expect(document.plan.rowHeight).toBe(24);
+    expect(document.plan.weekColumnWidth).toBe(72);
   });
 
   it('opens an item panel from the grid and closes it with the panel x', async () => {
@@ -425,6 +470,28 @@ describe('URL-owned app state', () => {
     await user.click(await screen.findByText('Milestone A'));
 
     expect(await screen.findByText('Locally saved task')).toBeInTheDocument();
+  });
+
+  it('deletes named local snapshots from the load dialog', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    act(() => {
+      useTimelineStore.getState().addTask({ name: 'Disposable save' });
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.change(await screen.findByLabelText('Saved plan name'), { target: { value: 'Disposable' } });
+    const saveButtons = screen.getAllByRole('button', { name: 'Save' });
+    await user.click(saveButtons[saveButtons.length - 1]);
+
+    await user.click(screen.getByRole('button', { name: 'Load' }));
+    expect(await screen.findByText('Disposable')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Delete Disposable' }));
+
+    expect(screen.queryByText('Disposable')).not.toBeInTheDocument();
   });
 
   it('loads compact JSON files from the load dialog', async () => {

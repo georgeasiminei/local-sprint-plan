@@ -2,8 +2,9 @@ import Button from '../ui/Button.jsx';
 import Modal from '../ui/Modal.jsx';
 
 import { useRef } from 'react';
+import { Trash2 } from 'lucide-react';
 
-export default function LoadPlanModal({ open, onClose, onLoad, onLoadJsonFile, savedPlans }) {
+export default function LoadPlanModal({ open, onClose, onDeleteSavedPlan, onLoad, onLoadJsonFile, savedPlans }) {
   const fileInputRef = useRef(null);
 
   return (
@@ -13,18 +14,28 @@ export default function LoadPlanModal({ open, onClose, onLoad, onLoadJsonFile, s
       ) : (
         <div className="space-y-2">
           {savedPlans.map((plan) => (
-            <button
-              key={plan.id}
-              type="button"
-              className="app-tooltip flex w-full items-center justify-between rounded border border-line px-3 py-2 text-left hover:bg-slate-50"
-              data-tooltip={`Load ${plan.name}`}
-              onClick={() => onLoad(plan.id)}
-            >
-              <span className="truncate text-sm font-medium">{plan.name}</span>
-              <span className="ml-3 shrink-0 text-xs text-slate-500">
-                {new Date(plan.savedAt).toLocaleString()}
-              </span>
-            </button>
+            <div key={plan.id} className="flex items-center gap-2">
+              <button
+                type="button"
+                className="app-tooltip flex min-w-0 flex-1 items-center justify-between rounded border border-line px-3 py-2 text-left hover:bg-slate-50"
+                data-tooltip={`Load ${plan.name}`}
+                onClick={() => onLoad(plan.id)}
+              >
+                <span className="truncate text-sm font-medium">{plan.name}</span>
+                <span className="ml-3 shrink-0 text-xs text-slate-500">
+                  {new Date(plan.savedAt).toLocaleString()}
+                </span>
+              </button>
+              <Button
+                variant="ghost"
+                className="size-9 shrink-0 p-0 text-red-700 hover:text-red-800"
+                aria-label={`Delete ${plan.name}`}
+                tooltip={`Delete ${plan.name}`}
+                onClick={() => onDeleteSavedPlan(plan.id)}
+              >
+                <Trash2 size={18} />
+              </Button>
+            </div>
           ))}
         </div>
       )}
