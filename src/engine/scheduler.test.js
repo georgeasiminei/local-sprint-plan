@@ -235,6 +235,62 @@ describe('recalculateSchedule', () => {
     ]);
   });
 
+  it('keeps higher-priority newly-unblocked tasks ahead of lower-priority independent work', () => {
+    const document = createPlanDocument({ startWeek: 1, startingResourceCount: 1 });
+    document.categories = [
+      { id: 'category-1', name: 'Foundation', order: 1 },
+      { id: 'category-2', name: 'Delivery', order: 2 },
+    ];
+    document.tasks = [
+      { id: 'task-1', categoryId: 'category-1', name: 'Foundation', priority: 1, estimateWeeks: 1 },
+      { id: 'task-2', categoryId: 'category-2', name: 'Delivery', priority: 2, estimateWeeks: 1 },
+      { id: 'task-3', categoryId: null, name: 'Independent lower priority', priority: 3, estimateWeeks: 2 },
+    ];
+    document.dependencies = [
+      {
+        id: 'dep-1',
+        predecessorType: 'category',
+        predecessorId: 'category-1',
+        successorType: 'category',
+        successorId: 'category-2',
+      },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1, isManual: false },
+      { taskId: 'task-2', weekIndex: 2, allocatedUnits: 1, isManual: false },
+      { taskId: 'task-3', weekIndex: 3, allocatedUnits: 1, isManual: false },
+      { taskId: 'task-3', weekIndex: 4, allocatedUnits: 1, isManual: false },
+    ]);
+  });
+
+  it('keeps extending the timeline until long delayed tasks are fully scheduled', () => {
+    const document = createPlanDocument({ startWeek: 16, startingResourceCount: 5 });
+    document.tasks = [
+      {
+        id: 'task-1',
+        name: 'Long delayed task',
+        priority: 1,
+        estimateWeeks: 19,
+        earliestStartWeek: 18,
+        resourceOverrides: [{ weekIndex: 18, allocatedUnits: 2 }],
+      },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule).toHaveLength(10);
+    expect(result.schedule.at(-1)).toEqual({
+      taskId: 'task-1',
+      weekIndex: 27,
+      allocatedUnits: 1,
+      isManual: false,
+    });
+    expect(result.warnings).toEqual([]);
+  });
+
   it('keeps completed task history frozen when inputs later change', () => {
     const document = createPlanDocument({ startWeek: 1, startingResourceCount: 5 });
     document.tasks = [
