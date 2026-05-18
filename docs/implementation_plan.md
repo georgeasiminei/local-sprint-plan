@@ -18,6 +18,7 @@ Build a local-only React planning app whose single active plan is owned by the b
 
 - Empty URL creates a default URL-owned plan without adding a hash until the first meaningful edit; hash URLs load directly without an import prompt.
 - Plan edits debounce `history.replaceState` updates.
+- Week and task-completion boundaries use local calendar dates, matching the date-only ISO-week UI rather than treating those labels as UTC instants.
 - `Save`, `Save as`, and `Load` manage named manual snapshots in `localStorage`; hover tooltips make the local-storage target explicit without bloating the toolbar.
 - Task resource edits are source rules that apply from the edited week onward.
 - Week resource edits live in the focused week panel. They apply from the selected week onward by default, with an "apply only to this week" checkbox for one-week changes.
@@ -38,6 +39,7 @@ Build a local-only React planning app whose single active plan is owned by the b
 - URL state uses a positional array schema with implicit IDs, numeric cross-references, palette-index colors, numeric dependency statuses, and omitted defaults.
 - Plan vacation days, categories, category vacation days, tasks, dependencies, external dependencies, teams, working-day adjustments, week resources, and manual/resource overrides are preserved as source data.
 - URL payloads use a single `d.` base64url deflate-raw format.
+- The current compact URL format is the first shipped hash format. If that positional schema ever changes incompatibly, add explicit URL-format versioning and migration before emitting the new format; object-document migrations alone are not enough for old shared links.
 
 ## Verification
 
