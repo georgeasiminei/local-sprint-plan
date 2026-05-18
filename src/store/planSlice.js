@@ -23,6 +23,8 @@ export function createPlanSlice(set, get) {
         hasAppliedAutoCompletion: false,
         savedPlanId: options.savedPlanId ?? null,
         savedPlanName: options.savedPlanName ?? null,
+        undoStack: [],
+        redoStack: [],
       });
     },
 
@@ -171,7 +173,6 @@ export function createPlanSlice(set, get) {
                   weekIndex: freeday.weekIndex ? freeday.weekIndex + startWeekDelta : freeday.weekIndex,
                 })),
           weekResources,
-          schedule: [],
         };
       });
     },

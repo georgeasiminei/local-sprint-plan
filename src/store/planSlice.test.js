@@ -24,6 +24,44 @@ describe('plan slice', () => {
     expect(after.weekResources).toEqual(before.weekResources);
   });
 
+  it('preserves the current schedule for display-only setting changes', () => {
+    const store = useTimelineStore.getState();
+    store.updateActiveDocument((document) => ({
+      ...document,
+      schedule: [{ taskId: 'task-1', weekIndex: 1, allocatedUnits: 1, isManual: false }],
+    }));
+
+    store.updatePlanSettings({ rowHeight: 22 });
+
+    expect(useTimelineStore.getState().getActiveDocument().schedule).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1, isManual: false },
+    ]);
+  });
+
+  it('clears undo and redo history when hydrating another plan', () => {
+    const store = useTimelineStore.getState();
+    store.updatePlanSettings({ rowHeight: 22 });
+    store.updatePlanSettings({ rowHeight: 23 });
+    store.undo();
+
+    expect(useTimelineStore.getState().undoStack.length).toBeGreaterThan(0);
+    expect(useTimelineStore.getState().redoStack.length).toBeGreaterThan(0);
+
+    const nextDocument = {
+      ...store.getActiveDocument(),
+      plan: {
+        ...store.getActiveDocument().plan,
+        id: 'loaded-plan',
+        name: 'Loaded plan',
+      },
+    };
+
+    store.hydratePlan(nextDocument);
+
+    expect(useTimelineStore.getState().undoStack).toEqual([]);
+    expect(useTimelineStore.getState().redoStack).toEqual([]);
+  });
+
   it('caps undo history at fifty documents', () => {
     const store = useTimelineStore.getState();
 
