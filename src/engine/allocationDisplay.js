@@ -9,6 +9,8 @@ import {
 } from './resourceResolver.js';
 import { roundToTenths } from '../utils/numbers.js';
 
+const RAW_CAP_SNAP_TOLERANCE = 0.15;
+
 export function getResourceAllocationForEntry(document, task, week, entry) {
   if (!document || !task || !week || !entry) {
     return null;
@@ -23,6 +25,18 @@ export function getResourceAllocationForEntry(document, task, week, entry) {
 
   if (context.productivityFactor <= 0) {
     return roundToTenths(effectiveAllocation);
+  }
+
+  const rawLimit = getTaskRawResourceLimit(task, week.weekIndex);
+  if (rawLimit !== null) {
+    const effectiveLimit = getEffectiveAllocationFromRaw(
+      rawLimit,
+      context.productivityFactor,
+      context.taskVacationResourceLoss,
+    );
+    if (Math.abs(effectiveAllocation - effectiveLimit) <= RAW_CAP_SNAP_TOLERANCE) {
+      return roundToTenths(rawLimit);
+    }
   }
 
   return roundToTenths((effectiveAllocation + context.taskVacationResourceLoss) / context.productivityFactor);
@@ -62,4 +76,29 @@ function getDisplayCapacityContext(document, task, week) {
     productivityFactor: resourceCount > 0 ? categoryVacationAdjusted / resourceCount : 1,
     taskVacationResourceLoss: taskVacationDays / 5,
   };
+}
+
+function getTaskRawResourceLimit(task, weekIndex) {
+  const rawLimits = [];
+  const override = [...(task.resourceOverrides ?? [])]
+    .filter((item) => item.weekIndex <= weekIndex)
+    .sort((a, b) => b.weekIndex - a.weekIndex)[0];
+
+  if (override) {
+    rawLimits.push(Math.max(0, Number(override.allocatedUnits) || 0));
+  }
+
+  if (task.maxResources !== null && task.maxResources !== undefined) {
+    rawLimits.push(Math.max(0, Number(task.maxResources) || 0));
+  }
+
+  if (rawLimits.length === 0) {
+    return null;
+  }
+
+  return Math.min(...rawLimits);
+}
+
+function getEffectiveAllocationFromRaw(rawAllocation, productivityFactor = 1, taskVacationResourceLoss = 0) {
+  return Math.max(0, (Number(rawAllocation) || 0) * productivityFactor - taskVacationResourceLoss);
 }
