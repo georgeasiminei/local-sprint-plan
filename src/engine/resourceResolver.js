@@ -63,6 +63,11 @@ export function countCategoryVacationDaysForWeek(week, category, workdays = 5) {
   return Math.max(0, Math.min(Number(entry?.dayCount) || 0, Number.MAX_SAFE_INTEGER)) || 0;
 }
 
+export function countTaskVacationDaysForWeek(week, task) {
+  const entry = (task?.vacations ?? []).find((vacation) => vacation.weekIndex === week.weekIndex);
+  return Math.max(0, Math.min(Number(entry?.dayCount) || 0, Number.MAX_SAFE_INTEGER)) || 0;
+}
+
 export function countPlanVacationDaysForWeek(week, vacations = []) {
   const entry = vacations.find((vacation) => vacation.weekIndex === week.weekIndex);
   return Math.max(0, Math.min(Number(entry?.dayCount) || 0, Number.MAX_SAFE_INTEGER)) || 0;

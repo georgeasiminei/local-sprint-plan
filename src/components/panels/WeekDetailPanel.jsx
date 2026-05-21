@@ -17,6 +17,7 @@ export default function WeekDetailPanel({ document }) {
   const requestWeekEdit = useTimelineStore((state) => state.requestWeekEdit);
   const setCategoryVacationDays = useTimelineStore((state) => state.setCategoryVacationDays);
   const setPlanVacationDays = useTimelineStore((state) => state.setPlanVacationDays);
+  const setTaskVacationDays = useTimelineStore((state) => state.setTaskVacationDays);
   const setWeekFreeDays = useTimelineStore((state) => state.setWeekFreeDays);
   const setWeekResource = useTimelineStore((state) => state.setWeekResource);
   const setWeekResourceForSingleWeek = useTimelineStore((state) => state.setWeekResourceForSingleWeek);
@@ -34,13 +35,20 @@ export default function WeekDetailPanel({ document }) {
       return 0;
     }
 
-    if (vacationScope === 'global') {
+    const parsedScope = parseVacationScope(vacationScope);
+
+    if (parsedScope.type === 'global') {
       return countPlanVacationDaysForWeek(week, document.plan?.vacations ?? []);
     }
 
-    const category = document.categories.find((item) => item.id === vacationScope);
-    return (category?.vacations ?? []).find((vacation) => vacation.weekIndex === week.weekIndex)?.dayCount ?? 0;
-  }, [document.categories, document.plan?.vacations, vacationScope, week]);
+    if (parsedScope.type === 'category') {
+      const category = document.categories.find((item) => item.id === parsedScope.id);
+      return (category?.vacations ?? []).find((vacation) => vacation.weekIndex === week.weekIndex)?.dayCount ?? 0;
+    }
+
+    const task = document.tasks.find((item) => item.id === parsedScope.id);
+    return (task?.vacations ?? []).find((vacation) => vacation.weekIndex === week.weekIndex)?.dayCount ?? 0;
+  }, [document.categories, document.plan?.vacations, document.tasks, vacationScope, week]);
 
   if (!week) {
     return (
@@ -77,12 +85,19 @@ export default function WeekDetailPanel({ document }) {
     }
 
     requestWeekEdit(week, () => {
-      if (vacationScope === 'global') {
+      const parsedScope = parseVacationScope(vacationScope);
+
+      if (parsedScope.type === 'global') {
         setPlanVacationDays(week.weekIndex, Number(value));
         return;
       }
 
-      setCategoryVacationDays(vacationScope, week.weekIndex, Number(value));
+      if (parsedScope.type === 'category') {
+        setCategoryVacationDays(parsedScope.id, week.weekIndex, Number(value));
+        return;
+      }
+
+      setTaskVacationDays(parsedScope.id, week.weekIndex, Number(value));
     });
   }
 
@@ -150,8 +165,13 @@ export default function WeekDetailPanel({ document }) {
             >
               <option value="global">Entire plan</option>
               {document.categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
+                <option key={category.id} value={`category:${category.id}`}>
+                  Category: {category.name}
+                </option>
+              ))}
+              {document.tasks.map((task) => (
+                <option key={task.id} value={`task:${task.id}`}>
+                  Task: {task.name}
                 </option>
               ))}
             </Select>
@@ -168,12 +188,28 @@ export default function WeekDetailPanel({ document }) {
             />
           </label>
           <p className="text-xs text-slate-500">
-            These are person-days. For example, 10 vacation days means two people are away for a full five-day week.
+            These are person-days. Entire-plan days affect every task, category days affect tasks in that category, and task days affect only the selected task.
           </p>
         </section>
       </div>
     </Sidebar>
   );
+}
+
+function parseVacationScope(scope) {
+  if (scope === 'global') {
+    return { type: 'global', id: null };
+  }
+
+  if (scope.startsWith('category:')) {
+    return { type: 'category', id: scope.slice('category:'.length) };
+  }
+
+  if (scope.startsWith('task:')) {
+    return { type: 'task', id: scope.slice('task:'.length) };
+  }
+
+  return { type: 'category', id: scope };
 }
 
 function DeferredNumberInput({ value, onCommit, ...props }) {

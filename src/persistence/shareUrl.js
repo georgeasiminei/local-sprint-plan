@@ -82,6 +82,7 @@ export function compactPlanDocument(document) {
         task.maxResources ?? null,
         compactRows(task.resourceOverrides, (override) => [override.weekIndex, override.allocatedUnits]),
         compactCompletedIntervals(task.completedIntervals),
+        compactRows(task.vacations, (vacation) => [vacation.weekIndex, vacation.dayCount]),
       ]),
     ),
     compactRows(document.dependencies, (dependency) =>
@@ -159,6 +160,7 @@ export function expandCompactPlanDocument(compactDocument) {
         weekIndex,
         allocatedUnits: value,
       })),
+      vacations: expandWeekValuePairs(task[10]).map(({ weekIndex, value }) => ({ weekIndex, dayCount: value })),
       ...(completedIntervals.length > 0
         ? {
             completed: true,

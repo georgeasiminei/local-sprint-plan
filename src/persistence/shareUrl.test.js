@@ -246,6 +246,26 @@ describe('URL plan payloads', () => {
     });
   });
 
+  it('round trips task vacation days in compact URL state', async () => {
+    const document = createPlanFixture({
+      tasks: [
+        {
+          id: 'task-1',
+          name: 'Task with vacation',
+          priority: 1,
+          estimateWeeks: 4,
+          vacations: [{ weekIndex: 3, dayCount: 2 }],
+        },
+      ],
+    });
+
+    const compact = compactPlanDocument(document);
+    const decoded = await decodePlanFromHashPayload(await encodePlanToHashPayload(document));
+
+    expect(compact[2][0][10]).toEqual([[3, 2]]);
+    expect(decoded.tasks[0].vacations).toEqual([{ weekIndex: 3, dayCount: 2 }]);
+  });
+
   it('keeps large encoded plans compact relative to runtime JSON', async () => {
     const document = createPlanFixture({
       categories: Array.from({ length: 6 }, (_, index) => ({

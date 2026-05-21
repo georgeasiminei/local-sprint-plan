@@ -203,6 +203,81 @@ describe('recalculateSchedule', () => {
     ]);
   });
 
+  it('applies plan vacation reductions to every capped task in the week', () => {
+    const document = createPlanDocument({
+      name: 'Plan vacation capped fixture',
+      startWeek: 1,
+      startingResourceCount: 5,
+    });
+    document.plan.vacations = [{ weekIndex: 1, dayCount: 5 }];
+    document.tasks = [
+      { id: 'task-1', categoryId: null, name: 'First capped task', priority: 1, estimateWeeks: 10, maxResources: 2 },
+      { id: 'task-2', categoryId: null, name: 'Second capped task', priority: 2, estimateWeeks: 10, maxResources: 3 },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.6, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 2.4, isManual: false },
+    ]);
+  });
+
+  it('applies category vacation reductions only to tasks in that category', () => {
+    const document = createPlanDocument({
+      name: 'Category vacation capped fixture',
+      startWeek: 1,
+      startingResourceCount: 5,
+    });
+    document.categories = [
+      {
+        id: 'category-1',
+        name: 'Delivery',
+        order: 1,
+        color: '#e0f2fe',
+        vacations: [{ weekIndex: 1, dayCount: 5 }],
+      },
+    ];
+    document.tasks = [
+      { id: 'task-1', categoryId: 'category-1', name: 'Category capped task', priority: 1, estimateWeeks: 10, maxResources: 2 },
+      { id: 'task-2', categoryId: null, name: 'Other capped task', priority: 2, estimateWeeks: 10, maxResources: 3 },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.6, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 3, isManual: false },
+    ]);
+  });
+
+  it('applies task vacation reductions only to the selected task', () => {
+    const document = createPlanDocument({
+      name: 'Task vacation fixture',
+      startWeek: 1,
+      startingResourceCount: 5,
+    });
+    document.tasks = [
+      {
+        id: 'task-1',
+        categoryId: null,
+        name: 'Vacation task',
+        priority: 1,
+        estimateWeeks: 10,
+        maxResources: 2,
+        vacations: [{ weekIndex: 1, dayCount: 5 }],
+      },
+      { id: 'task-2', categoryId: null, name: 'Unaffected task', priority: 2, estimateWeeks: 10, maxResources: 3 },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.6, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 3, isManual: false },
+    ]);
+  });
+
   it('preserves manual allocations and schedules the remaining estimate around them', () => {
     const document = createPlanDocument({
       name: 'Manual fixture',

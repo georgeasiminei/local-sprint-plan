@@ -159,6 +159,16 @@ function validateTasks(tasks, categoryIds, errors) {
       }
     }
 
+    for (const vacation of task.vacations ?? []) {
+      if (!isIntegerAtLeast(vacation.weekIndex, 1)) {
+        errors.push(`Task ${task.id} vacation weekIndex must be a positive integer.`);
+      }
+
+      if (!isNumberAtLeast(vacation.dayCount, 0)) {
+        errors.push(`Task ${task.id} vacation dayCount must be a non-negative number.`);
+      }
+    }
+
     if (task.completed !== undefined && typeof task.completed !== 'boolean') {
       errors.push(`Task ${task.id} completed must be a boolean.`);
     }

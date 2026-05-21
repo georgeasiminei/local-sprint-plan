@@ -50,7 +50,7 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 - Week resource edits apply to that week and following weeks by default; the week panel can limit the change to only the selected week.
 - Working days default to 5; set 4 for a week with one national holiday.
 - Working-day reductions apply to every scheduled task in that week. A one-day team holiday makes each task's resource contribution 80% for that week.
-- Vacation days are person-days. They can apply to the entire plan or to a selected category; 10 vacation days equals two people away for one five-day week.
+- Vacation days are person-days. They can apply to the entire plan, a selected category, or a selected task; scoped vacation reduces each affected task's contribution for that week.
 - Estimates and resource counts accept one decimal place, for example `12.7` man-weeks or `2.5` resources.
 - Tasks and categories can be moved up or down with small arrow controls in their focused side panel headers.
 - Editing a past week asks for confirmation before changing historical plan data.

@@ -624,7 +624,7 @@ describe('URL-owned app state', () => {
     const category = document.categories[0];
 
     await user.click(screen.getByRole('button', { name: firstWeek.label }));
-    await user.selectOptions(await screen.findByLabelText(`Vacation scope for ${firstWeek.label}`), category.id);
+    await user.selectOptions(await screen.findByLabelText(`Vacation scope for ${firstWeek.label}`), `category:${category.id}`);
     const vacationInput = screen.getByLabelText(`Vacation days for ${firstWeek.label}`);
     fireEvent.change(vacationInput, { target: { value: '5' } });
     fireEvent.blur(vacationInput);
@@ -636,6 +636,48 @@ describe('URL-owned app state', () => {
       expect(nextDocument.schedule).toEqual([
         expect.objectContaining({ taskId, weekIndex, allocatedUnits: 3 }),
         expect.objectContaining({ taskId, weekIndex: weekIndex + 1, allocatedUnits: 1 }),
+      ]);
+    });
+  });
+
+  it('edits task-specific vacation days from the week panel', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    act(() => {
+      const store = useTimelineStore.getState();
+      const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+      store.updatePlanSettings({ startYear: weekYear, startWeek: weekNumber, startingResourceCount: 5 });
+      store.addTask({
+        name: 'Vacation-scoped task',
+        estimateWeeks: 10,
+        maxResources: 2,
+      });
+      store.addTask({
+        name: 'Unaffected task',
+        estimateWeeks: 10,
+        maxResources: 3,
+      });
+    });
+
+    const document = useTimelineStore.getState().getActiveDocument();
+    const firstWeek = document.weeks[0];
+    const task = document.tasks[0];
+
+    await user.click(screen.getByRole('button', { name: firstWeek.label }));
+    await user.selectOptions(await screen.findByLabelText(`Vacation scope for ${firstWeek.label}`), `task:${task.id}`);
+    const vacationInput = screen.getByLabelText(`Vacation days for ${firstWeek.label}`);
+    fireEvent.change(vacationInput, { target: { value: '5' } });
+    fireEvent.blur(vacationInput);
+
+    await waitFor(() => {
+      const nextDocument = useTimelineStore.getState().getActiveDocument();
+      expect(nextDocument.tasks[0].vacations).toEqual([{ weekIndex: firstWeek.weekIndex, dayCount: 5 }]);
+      expect(nextDocument.schedule.filter((entry) => entry.weekIndex === firstWeek.weekIndex)).toEqual([
+        expect.objectContaining({ taskId: nextDocument.tasks[0].id, allocatedUnits: 1.6 }),
+        expect.objectContaining({ taskId: nextDocument.tasks[1].id, allocatedUnits: 3 }),
       ]);
     });
   });
