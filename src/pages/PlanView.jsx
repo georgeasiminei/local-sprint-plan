@@ -199,9 +199,12 @@ export default function PlanView() {
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-3 py-2">
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-ink">
-              {document.plan.name}{' '}
+              {document.plan.name}
+              <span className="px-1 text-[11px] font-medium text-slate-500" aria-hidden="true">
+                ·
+              </span>
               <span className="text-[11px] font-medium text-slate-500">
-                · Nothing is sent to a server, all data stays in this computer
+                Nothing is sent to a server, all data stays in this computer
               </span>
             </div>
             {importError ? <div className="truncate text-[11px] text-red-700">URL state error: {importError}</div> : null}
