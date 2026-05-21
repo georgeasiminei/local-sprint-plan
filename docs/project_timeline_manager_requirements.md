@@ -264,6 +264,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - **Plan name:** The current plan name is visible in the top-left header.
 - **Scrollable week area:** One column per ISO week, grouped under merged two-week sprint header rows. Horizontal scrolling moves week headers, task cells, total cells, and dependency lane content together.
 - The timeline scrolls horizontally as far as generated tasks and external dependency markers require.
+- On wide screens, the app uses the full available browser width before horizontal scrolling is needed.
 - **Fixed compact cells:** Task rows use a configurable fixed pixel height (`plan.rowHeight`, default 19px) and week columns use a configurable fixed pixel width (`plan.weekColumnWidth`, default 48px). Text is clipped/truncated instead of wrapping so row heights stay consistent. Task-to-task separation uses thin spreadsheet-like borders; category separation remains visually stronger.
 - Sprint headers span the correct number of week columns and expose editable sprint numbers.
 - Each data cell shows `allocatedUnits` for that task-week; empty if zero
