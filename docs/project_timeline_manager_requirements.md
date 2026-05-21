@@ -304,8 +304,8 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - **Typed resource entry:** Resource edits use typed text entry committed on blur or Enter, so a historical change prompts once for the completed value instead of once per spinner increment.
 - **Apply only to this week:** Optional checkbox that writes the resource change only for the selected week and restores the previous inherited value in the following week.
 - **Working days:** Defaults to 5. Set to 4 for a week with one national holiday. This reduces every resource's contribution for the selected week while raw capacity still displays unchanged.
-- **Vacation day scope:** Choose the entire plan, a category, or a task.
-- **Vacation days:** Person-days of absence. Entire-plan vacation days reduce every task's contribution; category vacation days reduce only tasks in the selected category; task vacation days reduce only the selected task.
+- **Vacation day scope:** Add one or more vacation entries for the week. Each entry chooses the entire plan, a category, or a task.
+- **Vacation days:** Person-days of absence. Multiple scoped entries can coexist in the same week, such as 10 days for one category plus 3 days for one task and 2 days for another task. Entire-plan vacation days reduce every task's contribution; category vacation days reduce only tasks in the selected category; task vacation days reduce only the selected task.
 
 ### 5.5 Dependency Manager
 - Adding a dependency first asks whether it is an external deadline marker or an internal task-to-task dependency.
