@@ -714,6 +714,7 @@ describe('URL-owned app state', () => {
 
     render(<App />);
     await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+    expect(screen.getByText('New project plan')).toBeInTheDocument();
 
     act(() => {
       useTimelineStore.getState().addTask({ name: 'Locally saved task' });
@@ -754,10 +755,10 @@ describe('URL-owned app state', () => {
     await user.click(saveButtons[saveButtons.length - 1]);
 
     await user.click(screen.getByRole('button', { name: 'Load' }));
-    expect(await screen.findByText('Disposable')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Delete Disposable' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Delete Disposable' }));
 
-    expect(screen.queryByText('Disposable')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete Disposable' })).not.toBeInTheDocument();
   });
 
   it('restores all saved plans from a backup so they appear under load', async () => {

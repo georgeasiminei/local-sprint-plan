@@ -138,7 +138,16 @@ export default function PlanView() {
   function loadNamedPlan(savedPlanIdToLoad) {
     try {
       const { document: savedDocument, savedPlan } = loadSavedPlan(savedPlanIdToLoad);
-      hydratePlan(savedDocument, { savedPlanId: savedPlan.id, savedPlanName: savedPlan.name });
+      hydratePlan(
+        {
+          ...savedDocument,
+          plan: {
+            ...savedDocument.plan,
+            name: savedPlan.name,
+          },
+        },
+        { savedPlanId: savedPlan.id, savedPlanName: savedPlan.name },
+      );
       setIsLoadModalOpen(false);
     } catch (error) {
       setImportError(error.message);
@@ -189,13 +198,13 @@ export default function PlanView() {
       <section className="min-w-0 rounded border border-line bg-white shadow-panel">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-3 py-2">
           <div className="min-w-0">
-            <div className="text-[11px] font-medium text-slate-500">
-              Nothing is sent to a server, all data stays in this computer
+            <div className="truncate text-sm font-semibold text-ink">
+              {document.plan.name}{' '}
+              <span className="text-[11px] font-medium text-slate-500">
+                · Nothing is sent to a server, all data stays in this computer
+              </span>
             </div>
-            <div className="truncate text-[11px] text-slate-500">
-              {document.tasks.length} tasks · {document.categories.length} categories ·{' '}
-              {importError ? `URL state error: ${importError}` : saveStatus}
-            </div>
+            {importError ? <div className="truncate text-[11px] text-red-700">URL state error: {importError}</div> : null}
             <div className="truncate text-[11px] text-slate-500">
               Original code:{' '}
               <a

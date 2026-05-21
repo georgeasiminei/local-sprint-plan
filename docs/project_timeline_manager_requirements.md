@@ -256,6 +256,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 > The timeline grid has two rendering layers: (1) an HTML table/CSS grid for task rows and data cells, and (2) an SVG overlay perfectly aligned on top of the grid for vertical line markers (dependency lines and today marker). The SVG overlay is position-absolute and pointer-events are set to none on lines so cell interaction is not blocked.
 
 - **Frozen left columns:** Category | Task name | Est (man-weeks) stay fixed while week columns scroll horizontally.
+- **Plan name:** The current plan name is visible in the top-left header.
 - **Scrollable week area:** One column per ISO week, grouped under merged two-week sprint header rows. Horizontal scrolling moves week headers, task cells, total cells, and dependency lane content together.
 - The timeline scrolls horizontally as far as generated tasks and external dependency markers require.
 - **Fixed compact cells:** Task rows use a configurable fixed pixel height (`plan.rowHeight`, default 19px) and week columns use a configurable fixed pixel width (`plan.weekColumnWidth`, default 48px). Text is clipped/truncated instead of wrapping so row heights stay consistent. Task-to-task separation uses thin spreadsheet-like borders; category separation remains visually stronger.
@@ -340,6 +341,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - Payload format: `d.<base64url(deflate-raw(JSON bytes))>`.
 - Everything after the first `#` is treated as the payload; no key prefix such as `p=` is used.
 - Store only source data needed to reconstruct the plan: plan settings and plan vacation days, categories and category vacation days, tasks, dependencies, external dependencies, teams, resource overrides, compact completed-task intervals, working-day adjustments, week resources, and manual allocation overrides.
+- The compact payload includes the plan name so exported JSON and copied URLs reopen with the same plan name.
 - The compact document is a positional array schema, not a human-readable object schema. It uses implicit IDs from row order, numeric cross-references, palette indexes for built-in colors, numeric external-dependency status codes, and omitted defaults.
 - Do not store generated weeks, generated sprints, computed schedule rows, timestamps, or long UUIDs.
 - Runtime short IDs such as `p1`, `c1`, `t1`, `d1`, and `team1` are regenerated from row order on load rather than persisted in the URL.

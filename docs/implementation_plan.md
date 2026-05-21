@@ -17,9 +17,10 @@ Build a local-only React planning app whose single active plan is owned by the b
 ## Key Behaviors
 
 - Empty URL creates a default URL-owned plan without adding a hash until the first meaningful edit; hash URLs load directly without an import prompt.
+- The active plan name is visible in the top-left header and is part of the compact JSON/URL source state.
 - Plan edits debounce `history.replaceState` updates.
 - Week and task-completion boundaries use local calendar dates, matching the date-only ISO-week UI rather than treating those labels as UTC instants.
-- `Save` and `Load` manage named manual snapshots in `localStorage`; saving always prompts for a name and updates the active plan name to match.
+- `Save` and `Load` manage named manual snapshots in `localStorage`; saving always prompts for a name and updates the active plan name to match, and loading a named snapshot applies that saved name to the active plan.
 - Task resource edits are source rules that apply from the edited week onward.
 - Week resource edits live in the focused week panel. They apply from the selected week onward by default, with an "apply only to this week" checkbox for one-week changes.
 - Task/category colors render only in scheduled cells with allocated resources.

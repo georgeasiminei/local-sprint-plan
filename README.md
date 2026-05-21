@@ -40,6 +40,7 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 
 - Weeks are ISO week-year columns labeled `YY.WW`.
 - Category and task columns stay frozen while the week columns scroll horizontally.
+- The current plan name is shown in the top-left header and is included in copied/exported JSON state.
 - Categories render as merged cells spanning their task rows to keep the table vertically compact.
 - Task/category colors appear only on weeks where the task has allocated resources.
 - Today is shown as a thin blue line positioned within the current week, while external dependency deadline lines keep their status colors on week borders.
