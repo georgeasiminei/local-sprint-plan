@@ -71,7 +71,7 @@ The app has one active plan. Runtime state uses a full document for rendering an
   "updatedAt": "runtime ISO8601"
 }
 ```
-Plan vacation days are person-days that reduce capacity across the whole plan for a week. Example: 10 vacation days means two people are away for one five-day week, reducing effective capacity by 2 resource-weeks.
+Plan vacation days are person-days that reduce capacity across the whole plan for a week. Example: 10 vacation days means two people are away for one five-day week, reducing effective capacity by 2 resource-weeks. The reduction affects every task active in that week, similar to working-day adjustments.
 
 ### 3.3 Categories
 Groups of tasks — displayed as collapsible section headers spanning all columns.
@@ -104,6 +104,9 @@ Category vacation days are person-days. They reduce effective scheduling capacit
   "resourceOverrides": [
     { "weekIndex": 21, "allocatedUnits": 3.0 }
   ],
+  "vacations": [
+    { "weekIndex": 21, "dayCount": 2 }
+  ],
   "completed": true,
   "completedIntervals": [
     { "startWeek": 21, "endWeek": 23, "allocatedUnits": 3.0 }
@@ -111,6 +114,7 @@ Category vacation days are person-days. They reduce effective scheduling capacit
 }
 ```
 Resource overrides are source rules. Setting a task cell to `x` resources at a week applies `x` from that week onward until another rule is set, and the scheduler regenerates the computed schedule from those rules.
+Task vacation days are source rules. They are person-days that reduce only the selected task's contribution in that week.
 Completed tasks are historical freezes. Once a task is completed, the app persists only compact run-length-style `completedIntervals` for its actual resource history and does not reschedule those rows later. If a timeline change makes the task future work again, the completion fields are removed so the URL stays compact.
 
 ### 3.5 Dependencies
@@ -220,7 +224,7 @@ Resource counts accept one decimal place.
    - `weekIndex >= earliestStartWeek` (if set)
 3. **Resource inheritance:** Missing `weekResources` entry → inherit from previous week.
 4. **Working days reduce working capacity:** `workingDayAdjustedCapacity = resourceCount × workingDays / 5`. A four-day week makes each resource count as `0.8` toward task estimates. This productivity factor applies to every activity in that week, including capped tasks and task resource rules; it is not applied only to whichever lower-priority task happens to receive the remaining capacity.
-5. **Vacation person-days reduce capacity:** `effectiveCapacity = max(0, workingDayAdjustedCapacity − planVacationDays / 5 − categoryVacationDays / 5)`. Example: 4 resources and 10 plan vacation days gives 2 effective resources in that week. Example: 4 resources and 5 category vacation days gives 3 effective resources for that category in that week.
+5. **Vacation person-days reduce capacity:** `effectiveCapacity = max(0, workingDayAdjustedCapacity − planVacationDays / 5 − categoryVacationDays / 5)`. Example: 4 resources and 10 plan vacation days gives 2 effective resources in that week. Example: 4 resources and 5 category vacation days gives 3 effective resources for that category in that week. Plan vacation applies to every task in the week, category vacation applies only to tasks in that category, and task vacation applies only to the selected task. Like working-day adjustments, scoped vacation also scales each affected task's weekly resource cap and task resource rules so the reduction is distributed across all affected activities rather than falling only on lower-priority work.
 6. **Raw capacity remains visible:** The total effort row still displays the raw resource capacity, not day-off/vacation-adjusted capacity.
 7. **Resource cap per task:** In any given week, the resources allocated to a task cannot exceed `maxResources` after the week's working-day productivity factor is applied. If `maxResources` is null, the task can consume all available team capacity. This means a capped task may take more calendar weeks than a naive estimate suggests, as excess capacity is left unused for that task and remains available for lower-priority tasks in the same week.
 8. **Task resource rules:** A task resource override applies from its `weekIndex` onward and limits that task's weekly allocation until the task completes or another override starts.
@@ -239,6 +243,7 @@ The schedule is fully recomputed (in-memory, synchronously) whenever:
 - Working days are changed for a week
 - Plan vacation days are added, removed, or edited
 - Category vacation days are added, removed, or edited
+- Task vacation days are added, removed, or edited
 - Sprint or week structure changes
 
 Recalculation is fast (< 100ms for typical plans) and runs on every state change before re-render.
@@ -298,8 +303,8 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - **Typed resource entry:** Resource edits use typed text entry committed on blur or Enter, so a historical change prompts once for the completed value instead of once per spinner increment.
 - **Apply only to this week:** Optional checkbox that writes the resource change only for the selected week and restores the previous inherited value in the following week.
 - **Working days:** Defaults to 5. Set to 4 for a week with one national holiday. This reduces every resource's contribution for the selected week while raw capacity still displays unchanged.
-- **Vacation day scope:** Choose either the entire plan or a category.
-- **Vacation days:** Person-days of absence. Entire-plan vacation days reduce all category capacity; category vacation days reduce effective capacity only for tasks in the selected category.
+- **Vacation day scope:** Choose the entire plan, a category, or a task.
+- **Vacation days:** Person-days of absence. Entire-plan vacation days reduce every task's contribution; category vacation days reduce only tasks in the selected category; task vacation days reduce only the selected task.
 
 ### 5.5 Dependency Manager
 - Adding a dependency first asks whether it is an external deadline marker or an internal task-to-task dependency.
@@ -340,7 +345,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - URL format: `https://app/#<payload>`.
 - Payload format: `d.<base64url(deflate-raw(JSON bytes))>`.
 - Everything after the first `#` is treated as the payload; no key prefix such as `p=` is used.
-- Store only source data needed to reconstruct the plan: plan settings and plan vacation days, categories and category vacation days, tasks, dependencies, external dependencies, teams, resource overrides, compact completed-task intervals, working-day adjustments, week resources, and manual allocation overrides.
+- Store only source data needed to reconstruct the plan: plan settings and plan vacation days, categories and category vacation days, tasks and task vacation days, dependencies, external dependencies, teams, resource overrides, compact completed-task intervals, working-day adjustments, week resources, and manual allocation overrides.
 - The compact payload includes the plan name so exported JSON and copied URLs reopen with the same plan name.
 - The compact document is a positional array schema, not a human-readable object schema. It uses implicit IDs from row order, numeric cross-references, palette indexes for built-in colors, numeric external-dependency status codes, and omitted defaults.
 - Do not store generated weeks, generated sprints, computed schedule rows, timestamps, or long UUIDs.

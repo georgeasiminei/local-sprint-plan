@@ -6,6 +6,7 @@ import {
   countCategoryVacationDaysForWeek,
   countFreeDaysForWeek,
   countPlanVacationDaysForWeek,
+  countTaskVacationDaysForWeek,
   resolveWeekResourceCount,
 } from './resourceResolver.js';
 import { buildCalculatedWeeks, buildFixedSprints } from './timeline.js';
@@ -172,10 +173,17 @@ function scheduleTask(options) {
       freedays: options.freedays,
       planVacations: options.planVacations,
       category: options.categoryById?.get(options.task.categoryId),
+      task: options.task,
     });
     const alreadyAllocated = options.allocatedByWeek.get(week.weekIndex) ?? 0;
     const available = Math.max(0, capacity.effectiveCapacity - alreadyAllocated);
-    const taskCapacity = getTaskWeekCapacity(options.task, week.weekIndex, available, capacity.productivityFactor);
+    const taskCapacity = getTaskWeekCapacity(
+      options.task,
+      week.weekIndex,
+      available,
+      capacity.productivityFactor,
+      capacity.uncappedFactor,
+    );
     const hasManualEntry = manualEntries.some((entry) => entry.weekIndex === week.weekIndex);
     if (hasManualEntry) {
       validateManualEntries(options, manualEntries.filter((entry) => entry.weekIndex === week.weekIndex));
@@ -221,6 +229,7 @@ function validateManualEntries(options, manualEntries) {
       freedays: options.freedays,
       planVacations: options.planVacations,
       category: options.categoryById?.get(options.task.categoryId),
+      task: options.task,
     });
     const maxResources = options.task.maxResources === null || options.task.maxResources === undefined
       ? Number.POSITIVE_INFINITY
@@ -236,27 +245,31 @@ function validateManualEntries(options, manualEntries) {
   }
 }
 
-function getWeekCapacityContext({ week, firstTeam, startingResourceCount, weekResources, freedays, planVacations, category }) {
+function getWeekCapacityContext({ week, firstTeam, startingResourceCount, weekResources, freedays, planVacations, category, task }) {
   if (!firstTeam) {
     return { effectiveCapacity: 0, productivityFactor: 0 };
   }
 
   const resourceCount = resolveWeekResourceCount(week.weekIndex, firstTeam.id, weekResources, startingResourceCount);
   const freeDays = countFreeDaysForWeek(week, freedays, firstTeam.id);
-  const productivityFactor = Math.max(0, (5 - freeDays) / 5);
   const workingDayAdjusted = applyFreeDays(resourceCount, freeDays);
   const planVacationDays = countPlanVacationDaysForWeek(week, planVacations);
   const planVacationAdjusted = applyVacationDays(workingDayAdjusted, planVacationDays);
   const vacationDays = countCategoryVacationDaysForWeek(week, category);
+  const categoryVacationAdjusted = applyVacationDays(planVacationAdjusted, vacationDays);
+  const taskVacationDays = countTaskVacationDaysForWeek(week, task);
+  const taskVacationAdjusted = applyVacationDays(categoryVacationAdjusted, taskVacationDays);
+
   return {
-    effectiveCapacity: applyVacationDays(planVacationAdjusted, vacationDays),
-    productivityFactor,
+    effectiveCapacity: categoryVacationAdjusted,
+    uncappedFactor: categoryVacationAdjusted > 0 ? taskVacationAdjusted / categoryVacationAdjusted : 0,
+    productivityFactor: resourceCount > 0 ? taskVacationAdjusted / resourceCount : 0,
   };
 }
 
-function getTaskWeekCapacity(task, weekIndex, available, productivityFactor = 1) {
+function getTaskWeekCapacity(task, weekIndex, available, productivityFactor = 1, uncappedFactor = 1) {
   const maxResourceCap = task.maxResources === null || task.maxResources === undefined
-    ? available
+    ? available * uncappedFactor
     : Math.min(available, task.maxResources * productivityFactor);
   const override = [...(task.resourceOverrides ?? [])]
     .filter((item) => item.weekIndex <= weekIndex)

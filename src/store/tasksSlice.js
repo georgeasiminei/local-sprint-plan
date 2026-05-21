@@ -28,6 +28,7 @@ export function createTasksSlice(set, get) {
             earliestStartWeek: null,
             maxResources: null,
             resourceOverrides: [],
+            vacations: [],
             ...task,
           },
         ],
@@ -52,6 +53,18 @@ export function createTasksSlice(set, get) {
       updateDocument(get, {
         tasks: (tasks) => moveTaskInCategory(tasks, taskId, direction),
       }),
+    setTaskVacationDays: (taskId, weekIndex, dayCount) =>
+      get().updateActiveDocument((document) => ({
+        ...document,
+        tasks: document.tasks.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                vacations: setVacationDays(task.vacations, weekIndex, dayCount),
+              }
+            : task,
+        ),
+      })),
     setTaskCompleted: (taskId, completed) =>
       get().updateActiveDocument((document) => ({
         ...document,
@@ -91,6 +104,17 @@ export function createTasksSlice(set, get) {
         tasks: shiftTask(document.tasks, taskId, Number(weekDelta) || 0, document.plan.startWeek ?? 1),
       })),
   };
+}
+
+function setVacationDays(vacations = [], weekIndex, dayCount) {
+  const normalizedDayCount = Math.max(0, Math.floor(Number(dayCount) || 0));
+  const retained = vacations.filter((vacation) => vacation.weekIndex !== weekIndex);
+
+  if (normalizedDayCount === 0) {
+    return retained;
+  }
+
+  return [...retained, { weekIndex, dayCount: normalizedDayCount }].sort((a, b) => a.weekIndex - b.weekIndex);
 }
 
 function normalizeTaskPatch(patch) {
