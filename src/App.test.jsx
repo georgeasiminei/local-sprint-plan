@@ -624,8 +624,9 @@ describe('URL-owned app state', () => {
     const category = document.categories[0];
 
     await user.click(screen.getByRole('button', { name: firstWeek.label }));
-    await user.selectOptions(await screen.findByLabelText(`Vacation scope for ${firstWeek.label}`), `category:${category.id}`);
-    const vacationInput = screen.getByLabelText(`Vacation days for ${firstWeek.label}`);
+    await user.selectOptions(await screen.findByLabelText(`New vacation scope for ${firstWeek.label}`), `category:${category.id}`);
+    await user.click(screen.getByRole('button', { name: `Add vacation scope for ${firstWeek.label}` }));
+    const vacationInput = await screen.findByLabelText(`Vacation days for Category: ${category.name} in ${firstWeek.label}`);
     fireEvent.change(vacationInput, { target: { value: '5' } });
     fireEvent.blur(vacationInput);
 
@@ -667,8 +668,9 @@ describe('URL-owned app state', () => {
     const task = document.tasks[0];
 
     await user.click(screen.getByRole('button', { name: firstWeek.label }));
-    await user.selectOptions(await screen.findByLabelText(`Vacation scope for ${firstWeek.label}`), `task:${task.id}`);
-    const vacationInput = screen.getByLabelText(`Vacation days for ${firstWeek.label}`);
+    await user.selectOptions(await screen.findByLabelText(`New vacation scope for ${firstWeek.label}`), `task:${task.id}`);
+    await user.click(screen.getByRole('button', { name: `Add vacation scope for ${firstWeek.label}` }));
+    const vacationInput = await screen.findByLabelText(`Vacation days for Task: ${task.name} in ${firstWeek.label}`);
     fireEvent.change(vacationInput, { target: { value: '5' } });
     fireEvent.blur(vacationInput);
 
@@ -716,7 +718,8 @@ describe('URL-owned app state', () => {
       ]);
     });
 
-    const planVacationInput = screen.getByLabelText(`Vacation days for ${firstWeek.label}`);
+    await user.click(screen.getByRole('button', { name: `Add vacation scope for ${firstWeek.label}` }));
+    const planVacationInput = await screen.findByLabelText(`Vacation days for Entire plan in ${firstWeek.label}`);
     fireEvent.change(planVacationInput, { target: { value: '10' } });
     fireEvent.blur(planVacationInput);
 

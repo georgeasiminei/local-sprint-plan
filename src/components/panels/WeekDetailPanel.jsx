@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import {
   countPlanVacationDaysForWeek,
   resolveWeekResourceCount,
@@ -11,7 +12,7 @@ import Select from '../ui/Select.jsx';
 
 export default function WeekDetailPanel({ document }) {
   const [applyOnlyThisWeek, setApplyOnlyThisWeek] = useState(false);
-  const [vacationScope, setVacationScope] = useState('global');
+  const [newVacationScope, setNewVacationScope] = useState('global');
   const selectedWeekIndex = useTimelineStore((state) => state.selectedWeekIndex);
   const closeSidebar = useTimelineStore((state) => state.closeSidebar);
   const requestWeekEdit = useTimelineStore((state) => state.requestWeekEdit);
@@ -30,25 +31,24 @@ export default function WeekDetailPanel({ document }) {
   const workingDays = firstTeam && week
     ? resolveWorkingDaysForWeek(week, document.freedays, firstTeam.id)
     : 5;
-  const scopedVacationDays = useMemo(() => {
-    if (!week) {
-      return 0;
+  const vacationOptions = useMemo(() => getVacationScopeOptions(document), [document]);
+  const vacationEntries = useMemo(
+    () => (week ? getVacationEntries(document, week, vacationOptions) : []),
+    [document, vacationOptions, week],
+  );
+  const usedVacationScopes = new Set(vacationEntries.map((entry) => entry.scope));
+  const availableVacationOptions = vacationOptions.filter((option) => !usedVacationScopes.has(option.value));
+
+  useEffect(() => {
+    if (availableVacationOptions.length === 0) {
+      setNewVacationScope('');
+      return;
     }
 
-    const parsedScope = parseVacationScope(vacationScope);
-
-    if (parsedScope.type === 'global') {
-      return countPlanVacationDaysForWeek(week, document.plan?.vacations ?? []);
+    if (!availableVacationOptions.some((option) => option.value === newVacationScope)) {
+      setNewVacationScope(availableVacationOptions[0].value);
     }
-
-    if (parsedScope.type === 'category') {
-      const category = document.categories.find((item) => item.id === parsedScope.id);
-      return (category?.vacations ?? []).find((vacation) => vacation.weekIndex === week.weekIndex)?.dayCount ?? 0;
-    }
-
-    const task = document.tasks.find((item) => item.id === parsedScope.id);
-    return (task?.vacations ?? []).find((vacation) => vacation.weekIndex === week.weekIndex)?.dayCount ?? 0;
-  }, [document.categories, document.plan?.vacations, document.tasks, vacationScope, week]);
+  }, [availableVacationOptions, newVacationScope]);
 
   if (!week) {
     return (
@@ -79,13 +79,13 @@ export default function WeekDetailPanel({ document }) {
     });
   }
 
-  function updateVacationDays(value) {
+  function updateVacationDays(scope, value) {
     if (!firstTeam) {
       return;
     }
 
     requestWeekEdit(week, () => {
-      const parsedScope = parseVacationScope(vacationScope);
+      const parsedScope = parseVacationScope(scope);
 
       if (parsedScope.type === 'global') {
         setPlanVacationDays(week.weekIndex, Number(value));
@@ -99,6 +99,14 @@ export default function WeekDetailPanel({ document }) {
 
       setTaskVacationDays(parsedScope.id, week.weekIndex, Number(value));
     });
+  }
+
+  function addVacationEntry() {
+    if (!newVacationScope) {
+      return;
+    }
+
+    updateVacationDays(newVacationScope, 1);
   }
 
   function updateWorkingDays(value) {
@@ -155,38 +163,63 @@ export default function WeekDetailPanel({ document }) {
 
         <section className="space-y-3">
           <div className="text-xs font-semibold uppercase text-slate-500">Vacation days</div>
-          <label className="block text-sm font-medium">
-            Scope
-            <Select
-              className="mt-1 w-full"
-              value={vacationScope}
-              aria-label={`Vacation scope for ${week.label}`}
-              onChange={(event) => setVacationScope(event.target.value)}
-            >
-              <option value="global">Entire plan</option>
-              {document.categories.map((category) => (
-                <option key={category.id} value={`category:${category.id}`}>
-                  Category: {category.name}
-                </option>
+          {vacationEntries.length > 0 ? (
+            <div className="space-y-2">
+              {vacationEntries.map((entry) => (
+                <div key={entry.scope} className="grid grid-cols-[1fr_64px_32px] items-end gap-2">
+                  <div className="min-w-0 text-sm">
+                    <div className="truncate font-medium">{entry.label}</div>
+                    <div className="text-[11px] text-slate-500">{entry.typeLabel}</div>
+                  </div>
+                  <Input
+                    className="w-full px-2 text-center"
+                    value={entry.dayCount}
+                    aria-label={`Vacation days for ${entry.label} in ${week.label}`}
+                    inputMode="numeric"
+                    onCommit={(value) => updateVacationDays(entry.scope, value)}
+                    as={DeferredNumberInput}
+                  />
+                  <button
+                    type="button"
+                    className="app-tooltip grid size-8 place-items-center rounded text-red-700 hover:bg-red-50 hover:text-red-800"
+                    data-tooltip={`Remove vacation days for ${entry.label}`}
+                    aria-label={`Remove vacation days for ${entry.label}`}
+                    onClick={() => updateVacationDays(entry.scope, 0)}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               ))}
-              {document.tasks.map((task) => (
-                <option key={task.id} value={`task:${task.id}`}>
-                  Task: {task.name}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">No vacation days set for this week.</p>
+          )}
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <Select
+              className="w-full"
+              value={newVacationScope}
+              aria-label={`New vacation scope for ${week.label}`}
+              onChange={(event) => setNewVacationScope(event.target.value)}
+              disabled={availableVacationOptions.length === 0}
+            >
+              {availableVacationOptions.length === 0 ? <option value="">All scopes added</option> : null}
+              {availableVacationOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </Select>
-          </label>
-          <label className="block text-sm font-medium">
-            Vacation days
-            <Input
-              className="mt-1 w-full"
-              value={scopedVacationDays}
-              aria-label={`Vacation days for ${week.label}`}
-              inputMode="numeric"
-              onCommit={updateVacationDays}
-              as={DeferredNumberInput}
-            />
-          </label>
+            <button
+              type="button"
+              className="app-tooltip inline-flex h-9 items-center justify-center rounded border border-line bg-white px-3 text-sm font-medium hover:bg-panel disabled:cursor-not-allowed disabled:opacity-50"
+              data-tooltip="Add vacation scope"
+              aria-label={`Add vacation scope for ${week.label}`}
+              disabled={!newVacationScope}
+              onClick={addVacationEntry}
+            >
+              <Plus size={16} />
+            </button>
+          </div>
           <p className="text-xs text-slate-500">
             These are person-days. Entire-plan days affect every task, category days affect tasks in that category, and task days affect only the selected task.
           </p>
@@ -210,6 +243,50 @@ function parseVacationScope(scope) {
   }
 
   return { type: 'category', id: scope };
+}
+
+function getVacationScopeOptions(document) {
+  return [
+    { value: 'global', label: 'Entire plan', typeLabel: 'Plan' },
+    ...document.categories.map((category) => ({
+      value: `category:${category.id}`,
+      label: `Category: ${category.name}`,
+      typeLabel: 'Category',
+    })),
+    ...document.tasks.map((task) => ({
+      value: `task:${task.id}`,
+      label: `Task: ${task.name}`,
+      typeLabel: 'Task',
+    })),
+  ];
+}
+
+function getVacationEntries(document, week, options) {
+  const optionsByValue = new Map(options.map((option) => [option.value, option]));
+  const entries = [];
+  const planDayCount = countPlanVacationDaysForWeek(week, document.plan?.vacations ?? []);
+
+  if (planDayCount > 0) {
+    entries.push({ ...optionsByValue.get('global'), scope: 'global', dayCount: planDayCount });
+  }
+
+  for (const category of document.categories) {
+    const dayCount = (category.vacations ?? []).find((vacation) => vacation.weekIndex === week.weekIndex)?.dayCount ?? 0;
+    const scope = `category:${category.id}`;
+    if (dayCount > 0) {
+      entries.push({ ...optionsByValue.get(scope), scope, dayCount });
+    }
+  }
+
+  for (const task of document.tasks) {
+    const dayCount = (task.vacations ?? []).find((vacation) => vacation.weekIndex === week.weekIndex)?.dayCount ?? 0;
+    const scope = `task:${task.id}`;
+    if (dayCount > 0) {
+      entries.push({ ...optionsByValue.get(scope), scope, dayCount });
+    }
+  }
+
+  return entries.filter((entry) => entry.label);
 }
 
 function DeferredNumberInput({ value, onCommit, ...props }) {
