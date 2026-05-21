@@ -66,6 +66,8 @@ export default function PlanView() {
   const updateActiveDocument = useTimelineStore((state) => state.updateActiveDocument);
   const undo = useTimelineStore((state) => state.undo);
   const redo = useTimelineStore((state) => state.redo);
+  const showEffectiveAllocations = useTimelineStore((state) => state.showEffectiveAllocations);
+  const setShowEffectiveAllocations = useTimelineStore((state) => state.setShowEffectiveAllocations);
   const { canUndo, canRedo } = useUndoRedo();
 
   if (!document) {
@@ -221,6 +223,15 @@ export default function PlanView() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <label className="flex h-9 items-center gap-2 rounded border border-line bg-white px-2 text-xs font-medium text-slate-700">
+              <input
+                type="checkbox"
+                className="size-3.5 rounded border-line text-focus focus:ring-focus/20"
+                checked={showEffectiveAllocations}
+                onChange={(event) => setShowEffectiveAllocations(event.target.checked)}
+              />
+              Effective resources
+            </label>
             <Button
               variant="ghost"
               className="size-11 p-0"
@@ -313,7 +324,7 @@ export default function PlanView() {
             </Button>
           </div>
         </header>
-        <TimelineGrid document={document} />
+        <TimelineGrid document={document} allocationView={showEffectiveAllocations ? 'effective' : 'resource'} />
       </section>
       {isSidebarOpen ? (
         <div className="space-y-4">

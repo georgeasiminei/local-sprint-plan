@@ -182,7 +182,7 @@ function scheduleTask(options) {
       week.weekIndex,
       available,
       capacity.productivityFactor,
-      capacity.uncappedFactor,
+      capacity.taskVacationResourceLoss,
     );
     const hasManualEntry = manualEntries.some((entry) => entry.weekIndex === week.weekIndex);
     if (hasManualEntry) {
@@ -221,7 +221,7 @@ function validateManualEntries(options, manualEntries) {
       continue;
     }
 
-    const { effectiveCapacity, productivityFactor } = getWeekCapacityContext({
+    const { effectiveCapacity, productivityFactor, taskVacationResourceLoss } = getWeekCapacityContext({
       week,
       firstTeam: options.firstTeam,
       startingResourceCount: options.startingResourceCount,
@@ -233,7 +233,7 @@ function validateManualEntries(options, manualEntries) {
     });
     const maxResources = options.task.maxResources === null || options.task.maxResources === undefined
       ? Number.POSITIVE_INFINITY
-      : options.task.maxResources * productivityFactor;
+      : getEffectiveAllocationFromRaw(options.task.maxResources, productivityFactor, taskVacationResourceLoss);
 
     if (entry.allocatedUnits > maxResources) {
       options.warnings.push(`${options.task.name} has a manual allocation above its max resources in ${week.label}.`);
@@ -247,7 +247,7 @@ function validateManualEntries(options, manualEntries) {
 
 function getWeekCapacityContext({ week, firstTeam, startingResourceCount, weekResources, freedays, planVacations, category, task }) {
   if (!firstTeam) {
-    return { effectiveCapacity: 0, productivityFactor: 0 };
+    return { effectiveCapacity: 0, productivityFactor: 0, taskVacationResourceLoss: 0 };
   }
 
   const resourceCount = resolveWeekResourceCount(week.weekIndex, firstTeam.id, weekResources, startingResourceCount);
@@ -258,19 +258,18 @@ function getWeekCapacityContext({ week, firstTeam, startingResourceCount, weekRe
   const vacationDays = countCategoryVacationDaysForWeek(week, category);
   const categoryVacationAdjusted = applyVacationDays(planVacationAdjusted, vacationDays);
   const taskVacationDays = countTaskVacationDaysForWeek(week, task);
-  const taskVacationAdjusted = applyVacationDays(categoryVacationAdjusted, taskVacationDays);
 
   return {
     effectiveCapacity: categoryVacationAdjusted,
-    uncappedFactor: categoryVacationAdjusted > 0 ? taskVacationAdjusted / categoryVacationAdjusted : 0,
-    productivityFactor: resourceCount > 0 ? taskVacationAdjusted / resourceCount : 0,
+    productivityFactor: resourceCount > 0 ? categoryVacationAdjusted / resourceCount : 0,
+    taskVacationResourceLoss: taskVacationDays / 5,
   };
 }
 
-function getTaskWeekCapacity(task, weekIndex, available, productivityFactor = 1, uncappedFactor = 1) {
+function getTaskWeekCapacity(task, weekIndex, available, productivityFactor = 1, taskVacationResourceLoss = 0) {
   const maxResourceCap = task.maxResources === null || task.maxResources === undefined
-    ? available * uncappedFactor
-    : Math.min(available, task.maxResources * productivityFactor);
+    ? Math.max(0, available - taskVacationResourceLoss)
+    : Math.min(available, getEffectiveAllocationFromRaw(task.maxResources, productivityFactor, taskVacationResourceLoss));
   const override = [...(task.resourceOverrides ?? [])]
     .filter((item) => item.weekIndex <= weekIndex)
     .sort((a, b) => b.weekIndex - a.weekIndex)[0];
@@ -279,7 +278,14 @@ function getTaskWeekCapacity(task, weekIndex, available, productivityFactor = 1,
     return maxResourceCap;
   }
 
-  return Math.min(maxResourceCap, Math.max(0, Number(override.allocatedUnits) || 0) * productivityFactor);
+  return Math.min(
+    maxResourceCap,
+    getEffectiveAllocationFromRaw(Math.max(0, Number(override.allocatedUnits) || 0), productivityFactor, taskVacationResourceLoss),
+  );
+}
+
+function getEffectiveAllocationFromRaw(rawAllocation, productivityFactor = 1, taskVacationResourceLoss = 0) {
+  return Math.max(0, (Number(rawAllocation) || 0) * productivityFactor - taskVacationResourceLoss);
 }
 
 function getEarliestStartWeek(task, dependenciesBySuccessor, completionWeekByTask, fallbackStartWeek) {

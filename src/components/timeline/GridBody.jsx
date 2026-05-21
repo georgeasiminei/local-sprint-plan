@@ -1,7 +1,7 @@
 import CategoryTaskGroup from './CategoryTaskGroup.jsx';
 import EffortSummaryRow from './EffortSummaryRow.jsx';
 
-export default function GridBody({ document, rowHeight, weekColumnWidth }) {
+export default function GridBody({ document, allocationView, rowHeight, weekColumnWidth }) {
   const uncategorizedTasks = document.tasks.filter((task) => !task.categoryId);
   const categories = [...document.categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
@@ -15,6 +15,7 @@ export default function GridBody({ document, rowHeight, weekColumnWidth }) {
             category={category}
             document={document}
             rowHeight={rowHeight}
+            allocationView={allocationView}
             schedule={document.schedule}
             tasks={tasks}
             weeks={document.weeks}
@@ -28,6 +29,7 @@ export default function GridBody({ document, rowHeight, weekColumnWidth }) {
           document={document}
           isSynthetic
           rowHeight={rowHeight}
+          allocationView={allocationView}
           schedule={document.schedule}
           tasks={uncategorizedTasks}
           weeks={document.weeks}

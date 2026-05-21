@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App.jsx';
 import { resolveWeekResourceCount } from './engine/resourceResolver.js';
@@ -678,10 +678,51 @@ describe('URL-owned app state', () => {
       const nextDocument = useTimelineStore.getState().getActiveDocument();
       expect(nextDocument.tasks[0].vacations).toEqual([{ weekIndex: firstWeek.weekIndex, dayCount: 5 }]);
       expect(nextDocument.schedule.filter((entry) => entry.weekIndex === firstWeek.weekIndex)).toEqual([
-        expect.objectContaining({ taskId: nextDocument.tasks[0].id, allocatedUnits: 1.6 }),
+        expect.objectContaining({ taskId: nextDocument.tasks[0].id, allocatedUnits: 1 }),
         expect.objectContaining({ taskId: nextDocument.tasks[1].id, allocatedUnits: 3 }),
       ]);
     });
+  });
+
+  it('switches between resource allocation and effective resource views', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    act(() => {
+      const store = useTimelineStore.getState();
+      const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+      store.updatePlanSettings({ startYear: weekYear, startWeek: weekNumber, startingResourceCount: 5 });
+      store.addTask({
+        name: 'View mode task',
+        estimateWeeks: 10,
+        maxResources: 2,
+        vacations: [{ weekIndex: weekNumber, dayCount: 5 }],
+      });
+    });
+
+    const firstWeek = useTimelineStore.getState().getActiveDocument().weeks[0];
+    const rawCell = await screen.findByRole('button', {
+      name: `Set View mode task resources in ${firstWeek.label}`,
+    });
+    expect(rawCell).toHaveTextContent('2');
+
+    await user.click(screen.getByRole('checkbox', { name: 'Effective resources' }));
+
+    const effectiveCell = await screen.findByRole('button', {
+      name: `View View mode task effective resources in ${firstWeek.label}`,
+    });
+    expect(effectiveCell).toHaveTextContent('1');
+    await user.click(effectiveCell);
+    expect(within(effectiveCell).queryByRole('textbox')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Effective resources' }));
+    const editableCell = await screen.findByRole('button', {
+      name: `Set View mode task resources in ${firstWeek.label}`,
+    });
+    await user.click(editableCell);
+    expect(within(editableCell).getByRole('textbox')).toHaveValue('2');
   });
 
   it('edits working days and plan vacation person-days from the week panel', async () => {
@@ -985,6 +1026,7 @@ function resetStore() {
     selectedDependencyId: null,
     isShiftTaskOpen: false,
     isSidebarOpen: false,
+    showEffectiveAllocations: false,
     activePanel: 'task',
     selectedExternalDependencyId: null,
     selectedWeekIndex: null,

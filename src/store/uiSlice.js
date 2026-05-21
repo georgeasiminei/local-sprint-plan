@@ -10,6 +10,7 @@ export function createUiSlice(set, get) {
     activePanel: 'task',
     isShiftTaskOpen: false,
     isSidebarOpen: false,
+    showEffectiveAllocations: false,
     pendingPastWeekEdit: null,
     undoStack: [],
     redoStack: [],
@@ -76,6 +77,7 @@ export function createUiSlice(set, get) {
     openShiftTask: () => set({ isShiftTaskOpen: true }),
     closeShiftTask: () => set({ isShiftTaskOpen: false }),
     closeSidebar: () => set({ isSidebarOpen: false }),
+    setShowEffectiveAllocations: (showEffectiveAllocations) => set({ showEffectiveAllocations }),
     deleteTaskWithGuard: (taskId) => {
       const document = get().getActiveDocument();
       const week = findPastWeekForTask(document, taskId);

@@ -273,7 +273,7 @@ describe('recalculateSchedule', () => {
     const result = recalculateSchedule(document);
 
     expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
-      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.6, isManual: false },
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1, isManual: false },
       { taskId: 'task-2', weekIndex: 1, allocatedUnits: 3, isManual: false },
     ]);
   });

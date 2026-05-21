@@ -4,7 +4,7 @@ import ExternalDependencyNotes from './ExternalDependencyNotes.jsx';
 import OverlayLines from './OverlayLines.jsx';
 import { DEFAULT_TIMELINE_ROW_HEIGHT, DEFAULT_WEEK_COLUMN_WIDTH, LEFT_COLUMN_WIDTH } from './layout.js';
 
-export default function TimelineGrid({ document }) {
+export default function TimelineGrid({ document, allocationView = 'resource' }) {
   const rowHeight = Math.max(16, Math.min(48, Number(document.plan?.rowHeight) || DEFAULT_TIMELINE_ROW_HEIGHT));
   const weekColumnWidth = Math.max(
     24,
@@ -16,7 +16,7 @@ export default function TimelineGrid({ document }) {
     <div className="overflow-x-auto overflow-y-hidden">
       <div className="relative" style={{ minWidth }}>
         <GridHeader weeks={document.weeks} sprints={document.sprints} weekColumnWidth={weekColumnWidth} />
-        <GridBody document={document} rowHeight={rowHeight} weekColumnWidth={weekColumnWidth} />
+        <GridBody document={document} allocationView={allocationView} rowHeight={rowHeight} weekColumnWidth={weekColumnWidth} />
         <ExternalDependencyNotes document={document} weekColumnWidth={weekColumnWidth} />
         <OverlayLines document={document} weekColumnWidth={weekColumnWidth} />
       </div>
