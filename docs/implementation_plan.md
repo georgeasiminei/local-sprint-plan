@@ -19,11 +19,11 @@ Build a local-only React planning app whose single active plan is owned by the b
 - Empty URL creates a default URL-owned plan without adding a hash until the first meaningful edit; hash URLs load directly without an import prompt.
 - Plan edits debounce `history.replaceState` updates.
 - Week and task-completion boundaries use local calendar dates, matching the date-only ISO-week UI rather than treating those labels as UTC instants.
-- `Save`, `Save as`, and `Load` manage named manual snapshots in `localStorage`; hover tooltips make the local-storage target explicit without bloating the toolbar.
+- `Save` and `Load` manage named manual snapshots in `localStorage`; saving always prompts for a name and updates the active plan name to match.
 - Task resource edits are source rules that apply from the edited week onward.
 - Week resource edits live in the focused week panel. They apply from the selected week onward by default, with an "apply only to this week" checkbox for one-week changes.
 - Task/category colors render only in scheduled cells with allocated resources.
-- Working days default to 5 and are edited from the week panel. A four-day holiday week contributes `resourceCount * 4 / 5` capacity while leaving the raw total capacity row unchanged.
+- Working days default to 5 and are edited from the week panel. A four-day holiday week contributes `resourceCount * 4 / 5` capacity while leaving the raw total capacity row unchanged, and that productivity factor scales every task allocation/cap in the affected week.
 - Vacation days are person-days edited from the week panel. Entire-plan vacation days reduce all category capacity; category vacation days reduce capacity only for tasks in that category.
 - Past week edits require confirmation before mutation.
 - Category edits live in the focused side panel; week capacity and vacation edits live in the focused week panel.
@@ -32,6 +32,8 @@ Build a local-only React planning app whose single active plan is owned by the b
 - Tasks created from a selected category inherit category and color.
 - `Task`, `Category`, and `Dependency` open focused right-side panels with close and delete controls. New task/category starter names are selected immediately for overwrite. Dependency creation supports external deadline markers and internal task-to-task dependencies.
 - Numeric entry uses plain edit boxes rather than browser steppers.
+- Estimates and resource values are normalized to one decimal place.
+- Task and category side panel headers expose discreet up/down icon controls for reordering the timeline list without cluttering the grid.
 - Selecting a task, category, or dependency and pressing Delete removes it, with past-week confirmation when historical schedule/deadline data is affected.
 
 ## Compact URL State

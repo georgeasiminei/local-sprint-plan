@@ -5,6 +5,7 @@ import {
   freezeTaskFromSchedule,
   isTaskCompletionAvailable,
 } from '../engine/taskCompletion.js';
+import { parseNonNegativeTenths } from '../utils/numbers.js';
 
 export function createTasksSlice(set, get) {
   return {
@@ -14,8 +15,8 @@ export function createTasksSlice(set, get) {
 
       updateDocument(get, {
         tasks: (tasks) => [
-            ...tasks,
-            {
+          ...tasks,
+          {
             id,
             categoryId: null,
             name: 'Untitled task',
@@ -45,7 +46,11 @@ export function createTasksSlice(set, get) {
     },
     updateTask: (taskId, patch) =>
       updateDocument(get, {
-        tasks: (tasks) => tasks.map((task) => (task.id === taskId ? { ...task, ...patch } : task)),
+        tasks: (tasks) => tasks.map((task) => (task.id === taskId ? { ...task, ...normalizeTaskPatch(patch) } : task)),
+      }),
+    moveTask: (taskId, direction) =>
+      updateDocument(get, {
+        tasks: (tasks) => moveTaskInCategory(tasks, taskId, direction),
       }),
     setTaskCompleted: (taskId, completed) =>
       get().updateActiveDocument((document) => ({
@@ -86,6 +91,45 @@ export function createTasksSlice(set, get) {
         tasks: shiftTask(document.tasks, taskId, Number(weekDelta) || 0, document.plan.startWeek ?? 1),
       })),
   };
+}
+
+function normalizeTaskPatch(patch) {
+  const nextPatch = { ...patch };
+
+  if (Object.prototype.hasOwnProperty.call(nextPatch, 'estimateWeeks')) {
+    nextPatch.estimateWeeks = parseNonNegativeTenths(nextPatch.estimateWeeks);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(nextPatch, 'maxResources') && nextPatch.maxResources !== null) {
+    nextPatch.maxResources = parseNonNegativeTenths(nextPatch.maxResources);
+  }
+
+  return nextPatch;
+}
+
+function moveTaskInCategory(tasks, taskId, direction) {
+  const task = tasks.find((item) => item.id === taskId);
+  if (!task) {
+    return tasks;
+  }
+
+  const categoryId = task.categoryId ?? null;
+  const siblings = tasks.filter((item) => (item.categoryId ?? null) === categoryId);
+  const siblingIndex = siblings.findIndex((item) => item.id === taskId);
+  const targetSiblingIndex = siblingIndex + (direction === 'up' ? -1 : 1);
+
+  if (siblingIndex < 0 || targetSiblingIndex < 0 || targetSiblingIndex >= siblings.length) {
+    return tasks;
+  }
+
+  const targetTask = siblings[targetSiblingIndex];
+  const nextTasks = [...tasks];
+  const sourceIndex = nextTasks.findIndex((item) => item.id === task.id);
+  const targetIndex = nextTasks.findIndex((item) => item.id === targetTask.id);
+  nextTasks[sourceIndex] = targetTask;
+  nextTasks[targetIndex] = task;
+
+  return nextTasks.map((item, index) => ({ ...item, priority: index + 1 }));
 }
 
 function updateDocument(get, transforms) {

@@ -5,6 +5,7 @@ import {
   isTaskCompletionAvailable,
   shouldAutoCompleteTask,
 } from '../engine/taskCompletion.js';
+import { parseNonNegativeTenths } from '../utils/numbers.js';
 
 export function createScheduleSlice(set, get) {
   return {
@@ -19,13 +20,13 @@ export function createScheduleSlice(set, get) {
         const nextSchedule = document.schedule.filter(
           (entry) => !(entry.taskId === taskId && entry.weekIndex === weekIndex),
         );
-        const value = Number(allocatedUnits);
+        const value = parseNonNegativeTenths(allocatedUnits);
 
-        if (Number.isFinite(value) && value > 0) {
+        if (value > 0) {
           nextSchedule.push({
             taskId,
             weekIndex,
-            allocatedUnits: Math.round(value * 100) / 100,
+            allocatedUnits: value,
             isManual: true,
           });
         }
@@ -42,8 +43,8 @@ export function createScheduleSlice(set, get) {
           return document;
         }
 
-        const value = Number(allocatedUnits);
-        const hasValue = Number.isFinite(value) && value > 0;
+        const value = parseNonNegativeTenths(allocatedUnits);
+        const hasValue = value > 0;
 
         return {
           ...document,
@@ -63,7 +64,7 @@ export function createScheduleSlice(set, get) {
                     ...previousOverrides,
                     {
                       weekIndex,
-                      allocatedUnits: Math.round(value * 100) / 100,
+                      allocatedUnits: value,
                     },
                   ].sort((a, b) => a.weekIndex - b.weekIndex)
                 : previousOverrides,

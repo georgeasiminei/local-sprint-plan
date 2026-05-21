@@ -724,6 +724,8 @@ describe('URL-owned app state', () => {
     const saveButtons = screen.getAllByRole('button', { name: 'Save' });
     await user.click(saveButtons[saveButtons.length - 1]);
 
+    expect(useTimelineStore.getState().getActiveDocument().plan.name).toBe('Milestone A');
+
     act(() => {
       useTimelineStore.getState().createPlan('Blank replacement');
     });

@@ -72,6 +72,73 @@ describe('recalculateSchedule', () => {
     ]);
   });
 
+  it('applies working-day reductions to every capped task in the week', () => {
+    const document = createPlanDocument({
+      name: 'Shared day off fixture',
+      startWeek: 1,
+      startingResourceCount: 5,
+    });
+    const teamId = document.teams[0].id;
+    document.freedays = [{ id: 'free-1', teamId, weekIndex: 1, date: null, reason: 'Holiday' }];
+    document.tasks = [
+      {
+        id: 'task-1',
+        categoryId: null,
+        name: 'First capped task',
+        priority: 1,
+        estimateWeeks: 10,
+        calcWeeks: 0,
+        earliestStartWeek: null,
+        maxResources: 2,
+      },
+      {
+        id: 'task-2',
+        categoryId: null,
+        name: 'Second capped task',
+        priority: 2,
+        estimateWeeks: 10,
+        calcWeeks: 0,
+        earliestStartWeek: null,
+        maxResources: 3,
+      },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.6, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 2.4, isManual: false },
+    ]);
+  });
+
+  it('schedules fractional estimates to one decimal place', () => {
+    const document = createPlanDocument({
+      name: 'Fractional estimate fixture',
+      startWeek: 1,
+      startingResourceCount: 5,
+    });
+    document.tasks = [
+      {
+        id: 'task-1',
+        categoryId: null,
+        name: 'Fractional task',
+        priority: 1,
+        estimateWeeks: 12.7,
+        calcWeeks: 0,
+        earliestStartWeek: null,
+        maxResources: null,
+      },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 5, isManual: false },
+      { taskId: 'task-1', weekIndex: 2, allocatedUnits: 5, isManual: false },
+      { taskId: 'task-1', weekIndex: 3, allocatedUnits: 2.7, isManual: false },
+    ]);
+  });
+
   it('reduces category task capacity for category vacation days without changing raw resources', () => {
     const document = createPlanDocument({
       name: 'Category vacation fixture',

@@ -71,4 +71,29 @@ describe('plan slice', () => {
 
     expect(useTimelineStore.getState().undoStack).toHaveLength(50);
   });
+
+  it('reorders tasks within their category and refreshes priority', () => {
+    const store = useTimelineStore.getState();
+    const categoryId = store.addCategory('Delivery');
+    const firstId = store.addTask({ name: 'First', categoryId });
+    const secondId = store.addTask({ name: 'Second', categoryId });
+
+    store.moveTask(secondId, 'up');
+
+    const tasks = useTimelineStore.getState().getActiveDocument().tasks;
+    expect(tasks.map((task) => task.id)).toEqual([secondId, firstId]);
+    expect(tasks.map((task) => task.priority)).toEqual([1, 2]);
+  });
+
+  it('reorders categories and refreshes order', () => {
+    const store = useTimelineStore.getState();
+    const firstId = store.addCategory('First');
+    const secondId = store.addCategory('Second');
+
+    store.moveCategory(secondId, 'up');
+
+    const categories = useTimelineStore.getState().getActiveDocument().categories;
+    expect(categories.map((category) => category.id)).toEqual([secondId, firstId]);
+    expect(categories.map((category) => category.order)).toEqual([1, 2]);
+  });
 });

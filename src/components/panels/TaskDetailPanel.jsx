@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { GitBranch, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { GitBranch, MoveDown, MoveUp, Trash2 } from 'lucide-react';
 import { useTimelineStore } from '../../store/index.js';
 import Sidebar from '../layout/Sidebar.jsx';
 import Button from '../ui/Button.jsx';
@@ -14,6 +14,7 @@ export default function TaskDetailPanel({ document }) {
   const updateTask = useTimelineStore((state) => state.updateTask);
   const closeSidebar = useTimelineStore((state) => state.closeSidebar);
   const deleteTaskWithGuard = useTimelineStore((state) => state.deleteTaskWithGuard);
+  const moveTask = useTimelineStore((state) => state.moveTask);
   const setTaskCompleted = useTimelineStore((state) => state.setTaskCompleted);
   const selectDependency = useTimelineStore((state) => state.selectDependency);
   const task = useMemo(
@@ -39,9 +40,25 @@ export default function TaskDetailPanel({ document }) {
 
   const internalDependencies = getDependenciesForEntity(document, 'task', task.id);
   const canCompleteTask = isTaskCompletionAvailable(document, task.id);
+  const siblingTasks = document.tasks.filter((item) => (item.categoryId ?? null) === (task.categoryId ?? null));
+  const taskIndex = siblingTasks.findIndex((item) => item.id === task.id);
+  const canMoveUp = taskIndex > 0;
+  const canMoveDown = taskIndex >= 0 && taskIndex < siblingTasks.length - 1;
 
   return (
-    <Sidebar title="Task" onClose={closeSidebar}>
+    <Sidebar
+      title="Task"
+      onClose={closeSidebar}
+      actions={
+        <ReorderHeaderActions
+          itemName={task.name}
+          canMoveDown={canMoveDown}
+          canMoveUp={canMoveUp}
+          onMoveDown={() => moveTask(task.id, 'down')}
+          onMoveUp={() => moveTask(task.id, 'up')}
+        />
+      }
+    >
       <div className="space-y-4">
         <label className="block text-sm font-medium">
           Name
@@ -84,10 +101,10 @@ export default function TaskDetailPanel({ document }) {
             Estimate
             <Input
               className="mt-1 w-full"
-              type="text"
               inputMode="decimal"
               value={task.estimateWeeks}
-              onChange={(event) => updateTask(task.id, { estimateWeeks: Number(event.target.value) })}
+              onCommit={(value) => updateTask(task.id, { estimateWeeks: value })}
+              as={DeferredNumberInput}
             />
           </label>
         </div>
@@ -112,15 +129,15 @@ export default function TaskDetailPanel({ document }) {
             Max resources
             <Input
               className="mt-1 w-full"
-              type="text"
               inputMode="decimal"
               value={task.maxResources ?? ''}
               placeholder="No cap"
-              onChange={(event) =>
+              onCommit={(value) =>
                 updateTask(task.id, {
-                  maxResources: event.target.value === '' ? null : Number(event.target.value),
+                  maxResources: value === '' ? null : value,
                 })
               }
+              as={DeferredNumberInput}
             />
           </label>
         </div>
@@ -178,6 +195,69 @@ export default function TaskDetailPanel({ document }) {
         </Button>
       </div>
     </Sidebar>
+  );
+}
+
+function ReorderHeaderActions({ canMoveDown, canMoveUp, itemName, onMoveDown, onMoveUp }) {
+  return (
+    <>
+      <button
+        type="button"
+        className="app-tooltip grid size-7 place-items-center rounded text-slate-400 hover:bg-panel hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+        data-tooltip="Move up"
+        aria-label={`Move ${itemName} up`}
+        disabled={!canMoveUp}
+        onClick={onMoveUp}
+      >
+        <MoveUp size={14} />
+      </button>
+      <button
+        type="button"
+        className="app-tooltip grid size-7 place-items-center rounded text-slate-400 hover:bg-panel hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+        data-tooltip="Move down"
+        aria-label={`Move ${itemName} down`}
+        disabled={!canMoveDown}
+        onClick={onMoveDown}
+      >
+        <MoveDown size={14} />
+      </button>
+    </>
+  );
+}
+
+function DeferredNumberInput({ value, onCommit, ...props }) {
+  const [draft, setDraft] = useState(String(value ?? ''));
+
+  useEffect(() => {
+    setDraft(String(value ?? ''));
+  }, [value]);
+
+  function commit() {
+    const trimmed = draft.trim();
+    if (trimmed === String(value ?? '')) {
+      return;
+    }
+
+    onCommit(trimmed);
+  }
+
+  return (
+    <input
+      {...props}
+      type="text"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
+        }
+        if (event.key === 'Escape') {
+          setDraft(String(value ?? ''));
+          event.currentTarget.blur();
+        }
+      }}
+    />
   );
 }
 

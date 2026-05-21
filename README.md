@@ -23,7 +23,7 @@ npm run test:watch
 
 ## Data Storage
 
-The URL hash is the active saved state. Manual `Save`, `Save as`, and `Load` actions keep named local snapshots in `localStorage` when the user explicitly asks for them. `Backup/restore` downloads or restores the full local snapshot library in one JSON file.
+The URL hash is the active saved state. Manual `Save` and `Load` actions keep named local snapshots in `localStorage` when the user explicitly asks for them. `Backup/restore` downloads or restores the full local snapshot library in one JSON file.
 
 The hash stores a compact source-only document and the app regenerates ISO weeks, sprints, and computed schedule rows in memory.
 
@@ -48,7 +48,10 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 - The total effort row shows assigned/capacity per week. Click a week header or total-effort cell to edit week resources, working days, and vacation days in the week panel.
 - Week resource edits apply to that week and following weeks by default; the week panel can limit the change to only the selected week.
 - Working days default to 5; set 4 for a week with one national holiday.
+- Working-day reductions apply to every scheduled task in that week. A one-day team holiday makes each task's resource contribution 80% for that week.
 - Vacation days are person-days. They can apply to the entire plan or to a selected category; 10 vacation days equals two people away for one five-day week.
+- Estimates and resource counts accept one decimal place, for example `12.7` man-weeks or `2.5` resources.
+- Tasks and categories can be moved up or down with small arrow controls in their focused side panel headers.
 - Editing a past week asks for confirmation before changing historical plan data.
 - Tasks in the past, or already in their final execution week, can be marked completed. Very old tasks are completed automatically on load, and their frozen history is removed again if the timeline is moved back into the future. Completed tasks show a subtle italic label plus a check icon in the grid.
 - Selecting a category before adding a task makes the task inherit that category and color.

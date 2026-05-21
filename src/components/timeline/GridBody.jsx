@@ -3,10 +3,11 @@ import EffortSummaryRow from './EffortSummaryRow.jsx';
 
 export default function GridBody({ document, rowHeight, weekColumnWidth }) {
   const uncategorizedTasks = document.tasks.filter((task) => !task.categoryId);
+  const categories = [...document.categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   return (
     <div>
-      {document.categories.map((category) => {
+      {categories.map((category) => {
         const tasks = document.tasks.filter((task) => task.categoryId === category.id);
         return (
           <CategoryTaskGroup

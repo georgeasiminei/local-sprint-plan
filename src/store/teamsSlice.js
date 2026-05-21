@@ -1,5 +1,6 @@
 import { createId } from '../utils/uuid.js';
 import { resolveWeekResourceCount } from '../engine/resourceResolver.js';
+import { parseNonNegativeTenths } from '../utils/numbers.js';
 
 export function createTeamsSlice(set, get) {
   return {
@@ -20,7 +21,7 @@ export function createTeamsSlice(set, get) {
         const resource = {
           id: weekResource.id ?? `week-resource-${weekResource.teamId}-${weekResource.weekIndex}`,
           ...weekResource,
-          resourceCount: Math.max(0, Number(weekResource.resourceCount) || 0),
+          resourceCount: parseNonNegativeTenths(weekResource.resourceCount),
         };
 
         return {
@@ -38,7 +39,7 @@ export function createTeamsSlice(set, get) {
         const resource = {
           id: weekResource.id ?? `week-resource-${weekResource.teamId}-${weekResource.weekIndex}`,
           ...weekResource,
-          resourceCount: Math.max(0, Number(weekResource.resourceCount) || 0),
+          resourceCount: parseNonNegativeTenths(weekResource.resourceCount),
         };
         const nextWeekIndex = resource.weekIndex + 1;
         const fallbackCount = document.plan?.startingResourceCount ?? 0;

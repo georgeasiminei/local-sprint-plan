@@ -1,5 +1,6 @@
 import { DEFAULT_PLAN_NAME, DEFAULT_ROW_HEIGHT, DEFAULT_WEEK_COLUMN_WIDTH } from '../constants/defaults.js';
 import { createPlanDocument } from '../persistence/schema.js';
+import { parseNonNegativeTenths } from '../utils/numbers.js';
 
 const MAX_UNDO_STACK = 50;
 
@@ -89,7 +90,7 @@ export function createPlanSlice(set, get) {
         const startWeekDelta = nextStartWeek - currentStartWeek;
         const startingResourceCount =
           patch.startingResourceCount !== undefined
-            ? Math.max(0, Number(patch.startingResourceCount) || 0)
+            ? parseNonNegativeTenths(patch.startingResourceCount)
             : (document.plan.startingResourceCount ?? document.weekResources[0]?.resourceCount ?? 0);
         const firstTeamId = document.teams[0]?.id;
         const shiftedWeekResources =

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { GitBranch, Trash2 } from 'lucide-react';
+import { GitBranch, MoveDown, MoveUp, Trash2 } from 'lucide-react';
 import { useTimelineStore } from '../../store/index.js';
 import Sidebar from '../layout/Sidebar.jsx';
 import Button from '../ui/Button.jsx';
@@ -11,6 +11,7 @@ export default function CategoryDetailPanel({ document }) {
   const selectedCategoryId = useTimelineStore((state) => state.selectedCategoryId);
   const closeSidebar = useTimelineStore((state) => state.closeSidebar);
   const deleteCategoryWithGuard = useTimelineStore((state) => state.deleteCategoryWithGuard);
+  const moveCategory = useTimelineStore((state) => state.moveCategory);
   const selectDependency = useTimelineStore((state) => state.selectDependency);
   const updateCategory = useTimelineStore((state) => state.updateCategory);
   const category = document.categories.find((item) => item.id === selectedCategoryId);
@@ -32,9 +33,25 @@ export default function CategoryDetailPanel({ document }) {
   }
 
   const internalDependencies = getDependenciesForEntity(document, 'category', category.id);
+  const orderedCategories = [...document.categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const categoryIndex = orderedCategories.findIndex((item) => item.id === category.id);
+  const canMoveUp = categoryIndex > 0;
+  const canMoveDown = categoryIndex >= 0 && categoryIndex < orderedCategories.length - 1;
 
   return (
-    <Sidebar title="Category" onClose={closeSidebar}>
+    <Sidebar
+      title="Category"
+      onClose={closeSidebar}
+      actions={
+        <ReorderHeaderActions
+          itemName={category.name}
+          canMoveDown={canMoveDown}
+          canMoveUp={canMoveUp}
+          onMoveDown={() => moveCategory(category.id, 'down')}
+          onMoveUp={() => moveCategory(category.id, 'up')}
+        />
+      }
+    >
       <div className="space-y-4">
         <label className="block text-sm font-medium">
           Name
@@ -71,6 +88,33 @@ export default function CategoryDetailPanel({ document }) {
         </Button>
       </div>
     </Sidebar>
+  );
+}
+
+function ReorderHeaderActions({ canMoveDown, canMoveUp, itemName, onMoveDown, onMoveUp }) {
+  return (
+    <>
+      <button
+        type="button"
+        className="app-tooltip grid size-7 place-items-center rounded text-slate-400 hover:bg-panel hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+        data-tooltip="Move up"
+        aria-label={`Move ${itemName} up`}
+        disabled={!canMoveUp}
+        onClick={onMoveUp}
+      >
+        <MoveUp size={14} />
+      </button>
+      <button
+        type="button"
+        className="app-tooltip grid size-7 place-items-center rounded text-slate-400 hover:bg-panel hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+        data-tooltip="Move down"
+        aria-label={`Move ${itemName} down`}
+        disabled={!canMoveDown}
+        onClick={onMoveDown}
+      >
+        <MoveDown size={14} />
+      </button>
+    </>
   );
 }
 
