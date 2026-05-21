@@ -42,7 +42,6 @@ import {
 export default function PlanView() {
   useSchedule();
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-  const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState(false);
   const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
   const [isBackupRestoreModalOpen, setIsBackupRestoreModalOpen] = useState(false);
   const [savedPlans, setSavedPlans] = useState(() => listSavedPlans());
@@ -57,7 +56,6 @@ export default function PlanView() {
   const openShiftTask = useTimelineStore((state) => state.openShiftTask);
   const saveStatus = useTimelineStore((state) => state.saveStatus);
   const savedPlanId = useTimelineStore((state) => state.savedPlanId);
-  const savedPlanName = useTimelineStore((state) => state.savedPlanName);
   const selectedCategoryId = useTimelineStore((state) => state.selectedCategoryId);
   const selectedTaskId = useTimelineStore((state) => state.selectedTaskId);
   const showDependencyPanel = useTimelineStore((state) => state.showDependencyPanel);
@@ -65,6 +63,7 @@ export default function PlanView() {
   const hydratePlan = useTimelineStore((state) => state.hydratePlan);
   const setImportError = useTimelineStore((state) => state.setImportError);
   const setSavedPlan = useTimelineStore((state) => state.setSavedPlan);
+  const updateActiveDocument = useTimelineStore((state) => state.updateActiveDocument);
   const undo = useTimelineStore((state) => state.undo);
   const redo = useTimelineStore((state) => state.redo);
   const { canUndo, canRedo } = useUndoRedo();
@@ -101,24 +100,33 @@ export default function PlanView() {
     );
   }
 
-  function saveNamedPlan(name, existingId = null) {
+  function saveNamedPlan(name) {
     try {
-      const savedPlan = savePlanSnapshot(name, document, existingId);
+      const normalizedName = name.trim();
+      const documentToSave = {
+        ...document,
+        plan: {
+          ...document.plan,
+          name: normalizedName,
+        },
+      };
+      const savedPlan = savePlanSnapshot(normalizedName, documentToSave, savedPlanId);
+      updateActiveDocument((current) => ({
+        ...current,
+        plan: {
+          ...current.plan,
+          name: savedPlan.name,
+        },
+      }));
       setSavedPlan({ id: savedPlan.id, name: savedPlan.name });
       setSavedPlans(listSavedPlans());
       setIsSaveModalOpen(false);
-      setIsSaveAsModalOpen(false);
     } catch (error) {
       setImportError(error.message);
     }
   }
 
   function saveCurrentPlan() {
-    if (savedPlanId && savedPlanName) {
-      saveNamedPlan(savedPlanName, savedPlanId);
-      return;
-    }
-
     setIsSaveModalOpen(true);
   }
 
@@ -130,7 +138,16 @@ export default function PlanView() {
   function loadNamedPlan(savedPlanIdToLoad) {
     try {
       const { document: savedDocument, savedPlan } = loadSavedPlan(savedPlanIdToLoad);
-      hydratePlan(savedDocument, { savedPlanId: savedPlan.id, savedPlanName: savedPlan.name });
+      hydratePlan(
+        {
+          ...savedDocument,
+          plan: {
+            ...savedDocument.plan,
+            name: savedPlan.name,
+          },
+        },
+        { savedPlanId: savedPlan.id, savedPlanName: savedPlan.name },
+      );
       setIsLoadModalOpen(false);
     } catch (error) {
       setImportError(error.message);
@@ -181,13 +198,16 @@ export default function PlanView() {
       <section className="min-w-0 rounded border border-line bg-white shadow-panel">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-3 py-2">
           <div className="min-w-0">
-            <div className="text-[11px] font-medium text-slate-500">
-              Nothing is sent to a server, all data stays in this computer
+            <div className="truncate text-sm font-semibold text-ink">
+              {document.plan.name}
+              <span className="px-1 text-[11px] font-medium text-slate-500" aria-hidden="true">
+                ·
+              </span>
+              <span className="text-[11px] font-medium text-slate-500">
+                Nothing is sent to a server, all data stays in this computer
+              </span>
             </div>
-            <div className="truncate text-[11px] text-slate-500">
-              {document.tasks.length} tasks · {document.categories.length} categories ·{' '}
-              {importError ? `URL state error: ${importError}` : saveStatus}
-            </div>
+            {importError ? <div className="truncate text-[11px] text-red-700">URL state error: {importError}</div> : null}
             <div className="truncate text-[11px] text-slate-500">
               Original code:{' '}
               <a
@@ -207,15 +227,6 @@ export default function PlanView() {
               onClick={saveCurrentPlan}
               aria-label="Save"
               tooltip="Save to local storage"
-            >
-              <Save size={28} />
-            </Button>
-            <Button
-              variant="ghost"
-              className="size-11 p-0"
-              onClick={() => setIsSaveAsModalOpen(true)}
-              aria-label="Save as"
-              tooltip="Save as a new local-storage snapshot"
             >
               <Save size={28} />
             </Button>
@@ -316,17 +327,10 @@ export default function PlanView() {
       <ShiftTaskModal document={document} open={isShiftTaskOpen} onClose={closeShiftTask} />
       <PastWeekEditModal />
       <SavePlanModal
-        initialName={savedPlanName ?? document.plan.name}
+        initialName={document.plan.name}
         open={isSaveModalOpen}
         onClose={() => setIsSaveModalOpen(false)}
-        onSave={(name) => saveNamedPlan(name, savedPlanId)}
-      />
-      <SavePlanModal
-        initialName={document.plan.name}
-        open={isSaveAsModalOpen}
-        title="Save plan as"
-        onClose={() => setIsSaveAsModalOpen(false)}
-        onSave={(name) => saveNamedPlan(name)}
+        onSave={saveNamedPlan}
       />
       <LoadPlanModal
         open={isLoadModalOpen}

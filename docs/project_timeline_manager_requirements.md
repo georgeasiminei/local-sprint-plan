@@ -60,7 +60,7 @@ The app has one active plan. Runtime state uses a full document for rendering an
   "startWeek": 12,
   "sprintStartNumber": 1,
   "sprintStartOrder": 1,
-  "startingResourceCount": 5,
+  "startingResourceCount": 5.0,
   "rowHeight": 19,
   "weekColumnWidth": 48,
   "showInternalDependencyLines": true,
@@ -95,18 +95,18 @@ Category vacation days are person-days. They reduce effective scheduling capacit
   "categoryId": "category id | null",
   "name": "OBI: Start Integration",
   "priority": 10,              // lower = higher priority; drives scheduling order
-  "estimateWeeks": 32.3,       // man-weeks (user input)
+  "estimateWeeks": 32.3,       // man-weeks; accepts one decimal place
   "calcWeeks": 32.2,           // system-computed (derived from resource allocation)
   "highlightColor": "#FFFF99", // optional per-task row color override
   "notes": "",
   "earliestStartWeek": null,   // integer week index constraint; null = no constraint
-  "maxResources": null,         // max number of resources that can work on this task in any single week; null = no limit
+  "maxResources": null,         // max resources in any single week; accepts one decimal place; null = no limit
   "resourceOverrides": [
-    { "weekIndex": 21, "allocatedUnits": 3 }
+    { "weekIndex": 21, "allocatedUnits": 3.0 }
   ],
   "completed": true,
   "completedIntervals": [
-    { "startWeek": 21, "endWeek": 23, "allocatedUnits": 3 }
+    { "startWeek": 21, "endWeek": 23, "allocatedUnits": 3.0 }
   ]
 }
 ```
@@ -195,6 +195,7 @@ Working days default to 5. The runtime stores non-working day entries so a week 
   "resourceCount": 13.0
 }
 ```
+Resource counts accept one decimal place.
 > **Inheritance rule:** If no entry exists for a week, the resource count equals the previous week's value. The first week must always have an explicit entry.
 
 ### 3.12 Schedule (computed)
@@ -218,10 +219,10 @@ Working days default to 5. The runtime stores non-working day entries so a week 
    - All predecessor tasks are fully completed, AND
    - `weekIndex >= earliestStartWeek` (if set)
 3. **Resource inheritance:** Missing `weekResources` entry → inherit from previous week.
-4. **Working days reduce working capacity:** `workingDayAdjustedCapacity = resourceCount × workingDays / 5`. A four-day week makes each resource count as `0.8` toward task estimates.
+4. **Working days reduce working capacity:** `workingDayAdjustedCapacity = resourceCount × workingDays / 5`. A four-day week makes each resource count as `0.8` toward task estimates. This productivity factor applies to every activity in that week, including capped tasks and task resource rules; it is not applied only to whichever lower-priority task happens to receive the remaining capacity.
 5. **Vacation person-days reduce capacity:** `effectiveCapacity = max(0, workingDayAdjustedCapacity − planVacationDays / 5 − categoryVacationDays / 5)`. Example: 4 resources and 10 plan vacation days gives 2 effective resources in that week. Example: 4 resources and 5 category vacation days gives 3 effective resources for that category in that week.
 6. **Raw capacity remains visible:** The total effort row still displays the raw resource capacity, not day-off/vacation-adjusted capacity.
-7. **Resource cap per task:** In any given week, the resources allocated to a task cannot exceed `maxResources`. If `maxResources` is null, the task can consume all available team capacity. This means a capped task may take more calendar weeks than a naive estimate suggests, as excess capacity is left unused for that task and remains available for lower-priority tasks in the same week.
+7. **Resource cap per task:** In any given week, the resources allocated to a task cannot exceed `maxResources` after the week's working-day productivity factor is applied. If `maxResources` is null, the task can consume all available team capacity. This means a capped task may take more calendar weeks than a naive estimate suggests, as excess capacity is left unused for that task and remains available for lower-priority tasks in the same week.
 8. **Task resource rules:** A task resource override applies from its `weekIndex` onward and limits that task's weekly allocation until the task completes or another override starts.
 9. **`calcWeeks`** is updated after scheduling: `estimateWeeks / avgResourcesUsed`
 10. **Manual overrides** (`isManual: true`) are locked — the engine distributes the remaining unscheduled portion of the task around them.
@@ -255,6 +256,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 > The timeline grid has two rendering layers: (1) an HTML table/CSS grid for task rows and data cells, and (2) an SVG overlay perfectly aligned on top of the grid for vertical line markers (dependency lines and today marker). The SVG overlay is position-absolute and pointer-events are set to none on lines so cell interaction is not blocked.
 
 - **Frozen left columns:** Category | Task name | Est (man-weeks) stay fixed while week columns scroll horizontally.
+- **Plan name:** The current plan name is visible in the top-left header.
 - **Scrollable week area:** One column per ISO week, grouped under merged two-week sprint header rows. Horizontal scrolling moves week headers, task cells, total cells, and dependency lane content together.
 - The timeline scrolls horizontally as far as generated tasks and external dependency markers require.
 - **Fixed compact cells:** Task rows use a configurable fixed pixel height (`plan.rowHeight`, default 19px) and week columns use a configurable fixed pixel width (`plan.weekColumnWidth`, default 48px). Text is clipped/truncated instead of wrapping so row heights stay consistent. Task-to-task separation uses thin spreadsheet-like borders; category separation remains visually stronger.
@@ -269,7 +271,8 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - **Total effort row:** Displayed below task rows. Each week shows `x/y`, where `x` is calculated assigned effort for that week and `y` is raw resource capacity for that week.
 - **External dependency markers:** Expected external inputs are rendered as full-height deadline lines on the border after the due week. These lines use red/neutral/green status colors and are visually distinct from the thin blue today line. Free-text boxes are displayed in a dedicated dependency lane below the task table so they do not cover schedule cells. Where space allows, same-week dependency boxes are centered on the deadline line and stack vertically; near edges they may fall to the available side / shrink as needed instead of escaping the scrollable timeline. Compact boxes may truncate long text, with the full note shown on hover.
 - **Category totals:** The merged category cell shows compact category summary values; task-week resource totals remain visible in task cells and the total effort row.
-- **Compact toolbar:** The timeline has one compact top toolbar with `Task`, `Category`, `Dependency`, shift, CSV export, `Save`, `Save as`, `Load`, `Backup/restore`, and settings actions. Save/load tooltips clarify that they use local storage, and the header links back to the original GitHub repository.
+- **Compact toolbar:** The timeline has one compact top toolbar with `Task`, `Category`, `Dependency`, shift, CSV export, `Save`, `Load`, `Backup/restore`, and settings actions. Save/load tooltips clarify that they use local storage, and the header links back to the original GitHub repository.
+- **Reordering:** Task and category side panel headers expose discreet move-up/move-down icon controls. Reordering tasks updates their priority/order in the list; reordering categories updates category order. The timeline grid itself stays free of persistent reorder controls.
 - **Focused side panel:** Clicking a task, category, dependency box, or add action opens a small right-side panel only for that item type. The panel has an `X` close control and a delete action.
 - **Keyboard delete:** With a task, category, or dependency selected, Delete removes it. If the deletion affects historical schedule/deadline data, the past-week confirmation appears before mutation.
 - **Past-week warning:** Mutating week-scoped values for weeks whose `endDate` is before today opens a confirmation modal before applying changes.
@@ -278,7 +281,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 ### 5.2 Task Detail Side Panel
 - Opens on row click
 - Can be closed to maximize horizontal timeline space
-- Fields: name, category, priority, estimate, notes, highlight color, earliestStartWeek, maxResources (numeric input; empty = no limit), plus a `Completed` checkbox whenever the task is historical or currently in its final execution week
+- Fields: name, category, priority, estimate (one decimal), notes, highlight color, earliestStartWeek, maxResources (one-decimal numeric input; empty = no limit), plus a `Completed` checkbox whenever the task is historical or currently in its final execution week
 - Dependencies list (incoming + outgoing) with add/remove controls
 - Per-week allocation table (override individual weeks)
 - Marking a task completed freezes its historical resource intervals. Tasks older than three weeks are auto-completed on load; if a timeframe change moves them back into the future, the completion control and frozen data are removed.
@@ -320,8 +323,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - If no hash exists, create a default plan without adding a hash until the first meaningful edit.
 - Every meaningful edit updates the hash with `history.replaceState` after a short debounce.
 - The active plan remains URL-owned even when local snapshots exist.
-- `Save` writes the current plan to the current named local snapshot, prompting for a name when needed.
-- `Save as` always prompts for a snapshot name.
+- `Save` always prompts for a snapshot name, prefilled with the current plan name. The submitted name becomes both the local snapshot name and the active plan name.
 - `Load` lists named plans stored in browser `localStorage` and replaces the active plan after selection.
 - `Backup/restore` can download one JSON backup containing all locally saved named plans and restore that backup later. Restore warns that it overwrites every locally saved plan in the current browser; restored plans then appear in `Load`.
 - New task/category starter names and the default local-save name are selected on focus so typing replaces them immediately.
@@ -339,6 +341,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - Payload format: `d.<base64url(deflate-raw(JSON bytes))>`.
 - Everything after the first `#` is treated as the payload; no key prefix such as `p=` is used.
 - Store only source data needed to reconstruct the plan: plan settings and plan vacation days, categories and category vacation days, tasks, dependencies, external dependencies, teams, resource overrides, compact completed-task intervals, working-day adjustments, week resources, and manual allocation overrides.
+- The compact payload includes the plan name so exported JSON and copied URLs reopen with the same plan name.
 - The compact document is a positional array schema, not a human-readable object schema. It uses implicit IDs from row order, numeric cross-references, palette indexes for built-in colors, numeric external-dependency status codes, and omitted defaults.
 - Do not store generated weeks, generated sprints, computed schedule rows, timestamps, or long UUIDs.
 - Runtime short IDs such as `p1`, `c1`, `t1`, `d1`, and `team1` are regenerated from row order on load rather than persisted in the URL.

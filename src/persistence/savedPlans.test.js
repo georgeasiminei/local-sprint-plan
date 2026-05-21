@@ -3,6 +3,7 @@ import { createPlanFixture } from '../test/fixtures/planDocument.js';
 import {
   createSavedPlansBackup,
   listSavedPlans,
+  loadSavedPlan,
   restoreSavedPlansBackup,
   savePlanSnapshot,
 } from './savedPlans.js';
@@ -21,6 +22,14 @@ describe('saved plan backups', () => {
     restoreSavedPlansBackup(backup);
 
     expect(listSavedPlans().map((plan) => plan.name).sort()).toEqual(['Plan A', 'Plan B']);
+  });
+
+  it('persists the plan name inside the saved compact document', () => {
+    const savedPlan = savePlanSnapshot('Named snapshot', createPlanFixture({ plan: { name: 'Named snapshot' } }));
+
+    const loaded = loadSavedPlan(savedPlan.id);
+
+    expect(loaded.document.plan.name).toBe('Named snapshot');
   });
 
   it('rejects unsupported backup shapes', () => {

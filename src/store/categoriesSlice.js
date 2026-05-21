@@ -40,6 +40,11 @@ export function createCategoriesSlice(set, get) {
           category.id === categoryId ? { ...category, ...patch } : category,
         ),
       })),
+    moveCategory: (categoryId, direction) =>
+      get().updateActiveDocument((document) => ({
+        ...document,
+        categories: moveCategory(document.categories, categoryId, direction),
+      })),
     setCategoryVacationDays: (categoryId, weekIndex, dayCount) =>
       get().updateActiveDocument((document) => ({
         ...document,
@@ -71,6 +76,19 @@ export function createCategoriesSlice(set, get) {
         ),
       })),
   };
+}
+
+function moveCategory(categories, categoryId, direction) {
+  const index = categories.findIndex((category) => category.id === categoryId);
+  const targetIndex = index + (direction === 'up' ? -1 : 1);
+
+  if (index < 0 || targetIndex < 0 || targetIndex >= categories.length) {
+    return categories;
+  }
+
+  const nextCategories = [...categories];
+  [nextCategories[index], nextCategories[targetIndex]] = [nextCategories[targetIndex], nextCategories[index]];
+  return nextCategories.map((category, orderIndex) => ({ ...category, order: orderIndex + 1 }));
 }
 
 function setVacationDays(vacations = [], weekIndex, dayCount) {
