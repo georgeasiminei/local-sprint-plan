@@ -1,7 +1,18 @@
 import { useState } from 'react';
 import { useTimelineStore } from '../../store/index.js';
 
-export default function TaskCell({ taskId, taskName, week, rowHeight, allocation, isManual, isOverride, isLocked, cellColor }) {
+export default function TaskCell({
+  taskId,
+  taskName,
+  week,
+  rowHeight,
+  allocation,
+  isManual,
+  isOverride,
+  isLocked,
+  isEditable = true,
+  cellColor,
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const requestWeekEdit = useTimelineStore((state) => state.requestWeekEdit);
   const setTaskResourceFromWeek = useTimelineStore((state) => state.setTaskResourceFromWeek);
@@ -9,7 +20,7 @@ export default function TaskCell({ taskId, taskName, week, rowHeight, allocation
 
   function commit(value) {
     setIsEditing(false);
-    if (!week || !taskId) {
+    if (!week || !taskId || !isEditable || isLocked) {
       return;
     }
     requestWeekEdit(week, () => setTaskResourceFromWeek(taskId, week.weekIndex, Number(value)));
@@ -17,9 +28,9 @@ export default function TaskCell({ taskId, taskName, week, rowHeight, allocation
 
   return (
     <div
-      role={week && taskId && !isLocked ? 'button' : undefined}
-      tabIndex={week && taskId && !isLocked ? 0 : undefined}
-      aria-label={week && taskId && !isLocked ? `Set ${taskName ?? 'task'} resources in ${week.label}` : undefined}
+      role={week && taskId ? 'button' : undefined}
+      tabIndex={week && taskId ? 0 : undefined}
+      aria-label={week && taskId ? getCellLabel(taskName, week, isEditable && !isLocked) : undefined}
       className="overflow-hidden border-b border-r border-slate-200 px-1 text-center text-xs"
       style={{ height: rowHeight, lineHeight: `${rowHeight}px`, ...(cellColor ? { backgroundColor: cellColor } : {}) }}
       onClick={(event) => {
@@ -27,17 +38,19 @@ export default function TaskCell({ taskId, taskName, week, rowHeight, allocation
         if (taskId) {
           selectTask(taskId);
         }
-        if (week && !isLocked) {
+        if (week && isEditable && !isLocked) {
           setIsEditing(true);
         }
       }}
       onKeyDown={(event) => {
-        if ((event.key === 'Enter' || event.key === ' ') && week && !isLocked) {
+        if ((event.key === 'Enter' || event.key === ' ') && week) {
           event.preventDefault();
           if (taskId) {
             selectTask(taskId);
           }
-          setIsEditing(true);
+          if (isEditable && !isLocked) {
+            setIsEditing(true);
+          }
         }
       }}
     >
@@ -75,4 +88,12 @@ export default function TaskCell({ taskId, taskName, week, rowHeight, allocation
       )}
     </div>
   );
+}
+
+function getCellLabel(taskName, week, canEdit) {
+  if (canEdit) {
+    return `Set ${taskName ?? 'task'} resources in ${week.label}`;
+  }
+
+  return `View ${taskName ?? 'task'} effective resources in ${week.label}`;
 }

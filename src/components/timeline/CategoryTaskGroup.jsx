@@ -1,5 +1,6 @@
 import { CheckCircle2, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useTimelineStore } from '../../store/index.js';
+import { getEffectiveAllocationForEntry, getResourceAllocationForEntry } from '../../engine/allocationDisplay.js';
 import { formatNumber } from '../../utils/format.js';
 import TaskCell from './TaskCell.jsx';
 import {
@@ -11,6 +12,7 @@ import { getDependenciesForEntity } from '../../utils/dependencies.js';
 
 export default function CategoryTaskGroup({
   category,
+  allocationView = 'resource',
   document,
   isSynthetic = false,
   rowHeight,
@@ -95,6 +97,7 @@ export default function CategoryTaskGroup({
             key={task.id}
             row={index + 1}
             rowHeight={rowHeight}
+            allocationView={allocationView}
             task={task}
             document={document}
             weeks={weeks}
@@ -114,6 +117,7 @@ export default function CategoryTaskGroup({
 function TaskGridRow({
   row,
   rowHeight,
+  allocationView,
   task,
   document,
   weeks,
@@ -191,6 +195,9 @@ function TaskGridRow({
           weeks.map((week) => {
             const entry = taskSchedule.find((item) => item.weekIndex === week.weekIndex);
             const isOverride = (task.resourceOverrides ?? []).some((override) => override.weekIndex === week.weekIndex);
+            const allocation = allocationView === 'effective'
+              ? getEffectiveAllocationForEntry(entry)
+              : getResourceAllocationForEntry(document, task, week, entry);
             return (
               <TaskCell
                 key={week.id}
@@ -198,10 +205,11 @@ function TaskGridRow({
                 taskName={task.name}
                 rowHeight={rowHeight}
                 week={week}
-                allocation={entry?.allocatedUnits}
+                allocation={allocation}
                 isManual={entry?.isManual}
                 isOverride={isOverride}
-                isLocked={task.completed}
+                isLocked={task.completed || allocationView === 'effective'}
+                isEditable={allocationView === 'resource'}
                 cellColor={entry?.allocatedUnits ? rowColor : null}
               />
             );

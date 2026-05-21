@@ -25,7 +25,7 @@ Build a local-only React planning app whose single active plan is owned by the b
 - Week resource edits live in the focused week panel. They apply from the selected week onward by default, with an "apply only to this week" checkbox for one-week changes.
 - Task/category colors render only in scheduled cells with allocated resources.
 - Working days default to 5 and are edited from the week panel. A four-day holiday week contributes `resourceCount * 4 / 5` capacity while leaving the raw total capacity row unchanged, and that productivity factor scales every task allocation/cap in the affected week.
-- Vacation days are person-days edited from the week panel. A week can contain multiple scoped vacation entries at once. Entire-plan vacation days reduce every task's weekly contribution, category vacation days reduce tasks in that category, and task vacation days reduce only the selected task.
+- Vacation days are person-days edited from the week panel. A week can contain multiple scoped vacation entries at once. Entire-plan vacation days reduce every task's weekly contribution, category vacation days reduce tasks in that category, and task vacation days reduce only the selected task. Task-scoped vacation subtracts from that task's effective resources, so 2 raw resources with 5 task vacation days displays as 1 effective resource.
 - Past week edits require confirmation before mutation.
 - Category edits live in the focused side panel; week capacity and vacation edits live in the focused week panel.
 - External dependency note boxes stay inside the visible timeline edge by choosing the available side and narrowing when necessary.
@@ -34,6 +34,7 @@ Build a local-only React planning app whose single active plan is owned by the b
 - `Task`, `Category`, and `Dependency` open focused right-side panels with close and delete controls. New task/category starter names are selected immediately for overwrite. Dependency creation supports external deadline markers and internal task-to-task dependencies.
 - Numeric entry uses plain edit boxes rather than browser steppers.
 - Estimates and resource values are normalized to one decimal place.
+- The timeline has a checkbox to switch between editable resource allocation view and read-only effective resource view. The total effort row shows effective allocation/resource allocation.
 - Task and category side panel headers expose discreet up/down icon controls for reordering the timeline list without cluttering the grid.
 - Selecting a task, category, or dependency and pressing Delete removes it, with past-week confirmation when historical schedule/deadline data is affected.
 
