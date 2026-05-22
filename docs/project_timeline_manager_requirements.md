@@ -109,13 +109,13 @@ Category vacation days are person-days. They reduce effective scheduling capacit
   ],
   "completed": true,
   "completedIntervals": [
-    { "startWeek": 21, "endWeek": 23, "allocatedUnits": 3.0 }
+    { "startWeek": 21, "endWeek": 23, "allocatedUnits": 2.4, "rawAllocatedUnits": 3.0 }
   ]
 }
 ```
 Resource overrides are source rules. Setting a task cell to `x` resources at a week applies `x` from that week onward until another rule is set, and the scheduler regenerates the computed schedule from those rules.
 Task vacation days are source rules. They are person-days that reduce only the selected task's contribution in that week.
-Completed tasks are historical freezes. Once a task is completed, the app persists only compact run-length-style `completedIntervals` for its actual resource history and does not reschedule those rows later. If a timeline change makes the task future work again, the completion fields are removed so the URL stays compact.
+Completed tasks are historical freezes. Once a task is completed, the app persists compact run-length-style `completedIntervals` for its actual effective history and, when different, the raw resource history. Completed rows still respect the raw/effective allocation view toggle and are not rescheduled later. If a timeline change makes the task future work again, the completion fields are removed so the URL stays compact.
 
 ### 3.5 Dependencies
 ```json
@@ -208,6 +208,7 @@ Resource counts accept one decimal place.
   "taskId": "uuid",
   "weekIndex": 13,
   "allocatedUnits": 2.9,   // resources × effective working fraction used this week
+  "rawAllocatedUnits": 3.0, // optional computed raw allocation before working-day/vacation reductions
   "isManual": false         // true = user pinned this cell; scheduler skips it
 }
 ```

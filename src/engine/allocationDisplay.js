@@ -16,8 +16,8 @@ export function getResourceAllocationForEntry(document, task, week, entry) {
     return null;
   }
 
-  if (entry.isCompleted) {
-    return roundToTenths(entry.allocatedUnits ?? 0);
+  if (entry.rawAllocatedUnits !== null && entry.rawAllocatedUnits !== undefined) {
+    return roundToTenths(entry.rawAllocatedUnits);
   }
 
   const context = getDisplayCapacityContext(document, task, week);

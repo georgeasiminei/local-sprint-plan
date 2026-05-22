@@ -8,11 +8,13 @@ export function compressScheduleToIntervals(entries = []) {
   return positiveEntries.reduce((intervals, entry) => {
     const last = intervals.at(-1);
     const allocatedUnits = roundAllocation(entry.allocatedUnits);
+    const rawAllocatedUnits = roundAllocation(entry.rawAllocatedUnits ?? entry.allocatedUnits);
 
     if (
       last &&
       last.endWeek + 1 === entry.weekIndex &&
-      last.allocatedUnits === allocatedUnits
+      last.allocatedUnits === allocatedUnits &&
+      (last.rawAllocatedUnits ?? last.allocatedUnits) === rawAllocatedUnits
     ) {
       last.endWeek = entry.weekIndex;
       return intervals;
@@ -22,6 +24,7 @@ export function compressScheduleToIntervals(entries = []) {
       startWeek: entry.weekIndex,
       endWeek: entry.weekIndex,
       allocatedUnits,
+      ...(rawAllocatedUnits !== allocatedUnits ? { rawAllocatedUnits } : {}),
     });
     return intervals;
   }, []);
@@ -38,6 +41,9 @@ export function expandCompletedIntervals(taskId, intervals = []) {
         taskId,
         weekIndex,
         allocatedUnits: roundAllocation(interval.allocatedUnits),
+        ...(interval.rawAllocatedUnits !== null && interval.rawAllocatedUnits !== undefined
+          ? { rawAllocatedUnits: roundAllocation(interval.rawAllocatedUnits) }
+          : {}),
         isManual: false,
         isCompleted: true,
       });

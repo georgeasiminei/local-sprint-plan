@@ -54,8 +54,11 @@ export function recalculateSchedule(document) {
       !completedTaskIds.has(entry.taskId) &&
       tasks.some((task) => task.id === entry.taskId),
   );
-  const allocatedByWeek = createManualAllocationMap([...manualEntries, ...completedEntries]);
-  const rawAllocatedByWeek = createManualAllocationMap([...manualEntries, ...completedEntries]);
+  const allocatedByWeek = createAllocationMap([...manualEntries, ...completedEntries], (entry) => entry.allocatedUnits);
+  const rawAllocatedByWeek = createAllocationMap(
+    [...manualEntries, ...completedEntries],
+    (entry) => entry.rawAllocatedUnits ?? entry.allocatedUnits,
+  );
   const manualEntriesByTask = groupManualEntriesByTask(manualEntries);
   const completionWeekByTask = new Map();
   const schedule = [];
@@ -108,17 +111,19 @@ export function recalculateSchedule(document) {
       rawAllocatedByWeek.set(
         entry.weekIndex,
         roundAllocation(
-          (rawAllocatedByWeek.get(entry.weekIndex) ?? 0) + getRawAllocationForScheduledEntry({
-            entry,
-            task,
-            week: weeks.find((item) => item.weekIndex === entry.weekIndex),
-            firstTeam,
-            startingResourceCount,
-            weekResources: document.weekResources ?? [],
-            freedays: document.freedays ?? [],
-            planVacations: document.plan?.vacations ?? [],
-            category: categoryById.get(task.categoryId),
-          }),
+          (rawAllocatedByWeek.get(entry.weekIndex) ?? 0) +
+            (entry.rawAllocatedUnits ??
+              getRawAllocationForScheduledEntry({
+                entry,
+                task,
+                week: weeks.find((item) => item.weekIndex === entry.weekIndex),
+                firstTeam,
+                startingResourceCount,
+                weekResources: document.weekResources ?? [],
+                freedays: document.freedays ?? [],
+                planVacations: document.plan?.vacations ?? [],
+                category: categoryById.get(task.categoryId),
+              })),
         ),
       );
     }
@@ -210,13 +215,18 @@ function scheduleTask(options) {
       validateManualEntries(options, manualEntries.filter((entry) => entry.weekIndex === week.weekIndex));
       continue;
     }
-    const allocation = Math.min(state.remainingEstimate, taskCapacity);
+    const allocation = Math.min(state.remainingEstimate, taskCapacity.effectiveCapacity);
 
     if (allocation > 0) {
+      const allocatedUnits = roundAllocation(allocation);
+      const rawAllocatedUnits = roundAllocation(
+        getRawAllocationForEffectiveAllocation(allocation, taskCapacity, capacity.productivityFactor, capacity.taskVacationResourceLoss),
+      );
       state.entries.push({
         taskId: options.task.id,
         weekIndex: week.weekIndex,
-        allocatedUnits: roundAllocation(allocation),
+        allocatedUnits,
+        ...(rawAllocatedUnits !== allocatedUnits ? { rawAllocatedUnits } : {}),
         isManual: false,
       });
       state.remainingEstimate = roundAllocation(state.remainingEstimate - allocation);
@@ -290,16 +300,26 @@ function getWeekCapacityContext({ week, firstTeam, startingResourceCount, weekRe
 
 function getTaskWeekCapacity(task, weekIndex, available, rawAvailable, productivityFactor = 1, taskVacationResourceLoss = 0) {
   const rawResourceCap = getTaskRawResourceCap(task, weekIndex, rawAvailable);
-  const maxResourceCap = Math.min(
-    available,
-    getEffectiveAllocationFromRaw(rawResourceCap, productivityFactor, taskVacationResourceLoss),
-  );
+  const effectiveFromRawCap = getEffectiveAllocationFromRaw(rawResourceCap, productivityFactor, taskVacationResourceLoss);
+  const effectiveCapacity = Math.min(available, effectiveFromRawCap);
   if (rawResourceCap <= 0) {
-    return 0;
+    return {
+      effectiveCapacity: 0,
+      available,
+      effectiveFromRawCap: 0,
+      rawAvailable,
+      rawResourceCap,
+    };
   }
 
   if (task.maxResources === null || task.maxResources === undefined) {
-    return maxResourceCap;
+    return {
+      effectiveCapacity,
+      available,
+      effectiveFromRawCap,
+      rawAvailable,
+      rawResourceCap,
+    };
   }
 
   const override = [...(task.resourceOverrides ?? [])]
@@ -307,13 +327,27 @@ function getTaskWeekCapacity(task, weekIndex, available, rawAvailable, productiv
     .sort((a, b) => b.weekIndex - a.weekIndex)[0];
 
   if (!override) {
-    return maxResourceCap;
+    return {
+      effectiveCapacity,
+      available,
+      effectiveFromRawCap,
+      rawAvailable,
+      rawResourceCap,
+    };
   }
 
-  return Math.min(
-    maxResourceCap,
+  const overrideEffectiveCapacity = Math.min(
+    effectiveCapacity,
     getEffectiveAllocationFromRaw(Math.max(0, Number(override.allocatedUnits) || 0), productivityFactor, taskVacationResourceLoss),
   );
+
+  return {
+    effectiveCapacity: overrideEffectiveCapacity,
+    available,
+    effectiveFromRawCap,
+    rawAvailable,
+    rawResourceCap,
+  };
 }
 
 function getTaskRawResourceCap(task, weekIndex, rawAvailable = Number.POSITIVE_INFINITY) {
@@ -381,6 +415,27 @@ function getEffectiveAllocationFromRaw(rawAllocation, productivityFactor = 1, ta
   return Math.max(0, (Number(rawAllocation) || 0) * productivityFactor - taskVacationResourceLoss);
 }
 
+function getRawAllocationForEffectiveAllocation(
+  effectiveAllocation,
+  taskCapacity,
+  productivityFactor = 1,
+  taskVacationResourceLoss = 0,
+) {
+  if (productivityFactor <= 0) {
+    return effectiveAllocation;
+  }
+
+  if (Math.abs(effectiveAllocation - taskCapacity.effectiveCapacity) <= 0.05) {
+    if (taskCapacity.available <= taskCapacity.effectiveFromRawCap + 0.05) {
+      return taskCapacity.rawAvailable;
+    }
+
+    return taskCapacity.rawResourceCap;
+  }
+
+  return (effectiveAllocation + taskVacationResourceLoss) / productivityFactor;
+}
+
 function getEarliestStartWeek(task, dependenciesBySuccessor, completionWeekByTask, fallbackStartWeek) {
   const taskStartWeek = task.earliestStartWeek ?? fallbackStartWeek;
   const dependencyStartWeek = (dependenciesBySuccessor.get(task.id) ?? []).reduce((latestWeek, dependency) => {
@@ -413,9 +468,9 @@ function groupManualEntriesByTask(entries) {
   }, new Map());
 }
 
-function createManualAllocationMap(entries) {
+function createAllocationMap(entries, getValue) {
   return entries.reduce((map, entry) => {
-    map.set(entry.weekIndex, (map.get(entry.weekIndex) ?? 0) + (entry.allocatedUnits ?? 0));
+    map.set(entry.weekIndex, (map.get(entry.weekIndex) ?? 0) + (getValue(entry) ?? 0));
     return map;
   }, new Map());
 }
