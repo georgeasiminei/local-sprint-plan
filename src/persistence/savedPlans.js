@@ -31,8 +31,12 @@ export function savePlanSnapshot(name, document, existingId = null) {
   return nextPlan;
 }
 
+export function getSavedPlan(savedPlanId) {
+  return readSavedPlans().find((plan) => plan.id === savedPlanId) ?? null;
+}
+
 export function loadSavedPlan(savedPlanId) {
-  const savedPlan = readSavedPlans().find((plan) => plan.id === savedPlanId);
+  const savedPlan = getSavedPlan(savedPlanId);
   if (!savedPlan) {
     throw new Error('Saved plan was not found.');
   }

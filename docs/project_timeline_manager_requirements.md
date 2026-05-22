@@ -331,7 +331,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - If no hash exists, create a default plan without adding a hash until the first meaningful edit.
 - Every meaningful edit updates the hash with `history.replaceState` after a short debounce.
 - The active plan remains URL-owned even when local snapshots exist.
-- `Save` always prompts for a snapshot name, prefilled with the current plan name. The submitted name becomes both the local snapshot name and the active plan name.
+- `Save` always prompts for a snapshot name, prefilled with the current plan name. Saving with the current saved snapshot name updates that snapshot. Changing the submitted name behaves like Save as: it creates a new local snapshot, keeps the previous saved snapshot, and makes the submitted name the active plan name.
 - `Load` lists named plans stored in browser `localStorage` and replaces the active plan after selection.
 - `Backup/restore` can download one JSON backup containing all locally saved named plans and restore that backup later. Restore warns that it overwrites every locally saved plan in the current browser; restored plans then appear in `Load`.
 - New task/category starter names and the default local-save name are selected on focus so typing replaces them immediately.

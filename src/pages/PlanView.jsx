@@ -34,6 +34,7 @@ import BackupRestoreModal from '../components/panels/BackupRestoreModal.jsx';
 import {
   createSavedPlansBackup,
   deleteSavedPlan,
+  getSavedPlan,
   listSavedPlans,
   loadSavedPlan,
   restoreSavedPlansBackup,
@@ -57,6 +58,7 @@ export default function PlanView() {
   const openShiftTask = useTimelineStore((state) => state.openShiftTask);
   const saveStatus = useTimelineStore((state) => state.saveStatus);
   const savedPlanId = useTimelineStore((state) => state.savedPlanId);
+  const savedPlanName = useTimelineStore((state) => state.savedPlanName);
   const selectedCategoryId = useTimelineStore((state) => state.selectedCategoryId);
   const selectedTaskId = useTimelineStore((state) => state.selectedTaskId);
   const selectedTaskWeekIndex = useTimelineStore((state) => state.selectedTaskWeekIndex);
@@ -116,7 +118,10 @@ export default function PlanView() {
           name: normalizedName,
         },
       };
-      const savedPlan = savePlanSnapshot(normalizedName, documentToSave, savedPlanId);
+      const currentSavedPlanName = savedPlanName ?? (savedPlanId ? getSavedPlan(savedPlanId)?.name : null);
+      const shouldUpdateCurrentSave =
+        savedPlanId && currentSavedPlanName?.trim().toLocaleLowerCase() === normalizedName.toLocaleLowerCase();
+      const savedPlan = savePlanSnapshot(normalizedName, documentToSave, shouldUpdateCurrentSave ? savedPlanId : null);
       updateActiveDocument((current) => ({
         ...current,
         plan: {
@@ -237,7 +242,7 @@ export default function PlanView() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <label
-              className="app-tooltip flex h-9 items-center gap-2 rounded border border-line bg-white px-2 text-xs font-medium text-slate-700"
+              className="app-tooltip app-tooltip-right flex h-9 items-center gap-2 rounded border border-line bg-white px-2 text-xs font-medium text-slate-700"
               data-tooltip="Show day-off and vacation adjusted resources. Uncheck to edit planned allocation."
             >
               <input

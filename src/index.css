@@ -47,11 +47,24 @@ textarea {
   transition:
     opacity 100ms ease,
     transform 100ms ease;
-  white-space: nowrap;
+  white-space: normal;
+  width: max-content;
+  overflow-wrap: break-word;
+}
+
+.app-tooltip-right[data-tooltip]::after {
+  left: auto;
+  right: 0;
+  transform: translate(0, -4px);
 }
 
 .app-tooltip[data-tooltip]:hover::after,
 .app-tooltip[data-tooltip]:focus-visible::after {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+.app-tooltip-right[data-tooltip]:hover::after,
+.app-tooltip-right[data-tooltip]:focus-visible::after {
+  transform: translate(0, 0);
 }

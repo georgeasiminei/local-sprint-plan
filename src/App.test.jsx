@@ -7,6 +7,7 @@ import { getCurrentIsoWeekInfo } from './engine/timeline.js';
 import { useTimelineStore } from './store/index.js';
 import { createPlanFixture } from './test/fixtures/planDocument.js';
 import { decodePlanFromHashPayload, encodePlanToHashPayload } from './persistence/shareUrl.js';
+import { listSavedPlans } from './persistence/savedPlans.js';
 
 describe('URL-owned app state', () => {
   beforeEach(() => {
@@ -730,7 +731,7 @@ describe('URL-owned app state', () => {
     await user.click(editableCell);
     expect(within(editableCell).queryByRole('textbox')).not.toBeInTheDocument();
     await user.dblClick(editableCell);
-    expect(within(editableCell).getByRole('textbox')).toHaveValue('2');
+    expect(screen.getByLabelText(`Resource value for View mode task in ${firstWeek.label}`)).toHaveValue('2');
   });
 
   it('selects resource cells without creating overrides and edits them explicitly', async () => {
@@ -760,10 +761,10 @@ describe('URL-owned app state', () => {
     expect(within(cell).queryByRole('textbox')).not.toBeInTheDocument();
 
     await user.dblClick(cell);
-    const input = within(cell).getByLabelText(`Resource value for Explicit edit task in ${firstWeek.label}`);
+    const input = screen.getByLabelText(`Resource value for Explicit edit task in ${firstWeek.label}`);
     await user.clear(input);
     await user.type(input, '4');
-    await user.click(within(cell).getByRole('button', { name: 'Set' }));
+    await user.click(screen.getByRole('button', { name: 'Set' }));
 
     await waitFor(() => {
       expect(useTimelineStore.getState().getActiveDocument().tasks[0].resourceOverrides).toEqual([
@@ -772,14 +773,14 @@ describe('URL-owned app state', () => {
     });
 
     await user.dblClick(cell);
-    await user.click(within(cell).getByRole('button', { name: 'Unset' }));
+    await user.click(screen.getByRole('button', { name: 'Unset' }));
 
     await waitFor(() => {
       expect(useTimelineStore.getState().getActiveDocument().tasks[0].resourceOverrides).toEqual([]);
     });
 
     await user.dblClick(cell);
-    const enterInput = within(cell).getByLabelText(`Resource value for Explicit edit task in ${firstWeek.label}`);
+    const enterInput = screen.getByLabelText(`Resource value for Explicit edit task in ${firstWeek.label}`);
     await user.clear(enterInput);
     await user.type(enterInput, '3{Enter}');
 
@@ -788,7 +789,7 @@ describe('URL-owned app state', () => {
         { weekIndex: firstWeek.weekIndex, allocatedUnits: 3 },
       ]);
     });
-    expect(within(cell).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(`Resource value for Explicit edit task in ${firstWeek.label}`)).not.toBeInTheDocument();
   });
 
   it('cancels the explicit resource editor when clicking elsewhere', async () => {
@@ -813,14 +814,14 @@ describe('URL-owned app state', () => {
     });
 
     await user.dblClick(cell);
-    const input = within(cell).getByLabelText(`Resource value for Cancel edit task in ${firstWeek.label}`);
+    const input = screen.getByLabelText(`Resource value for Cancel edit task in ${firstWeek.label}`);
     await user.clear(input);
     await user.type(input, '4');
 
     fireEvent.pointerDown(document.body);
 
     await waitFor(() => {
-      expect(within(cell).queryByRole('textbox')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(`Resource value for Cancel edit task in ${firstWeek.label}`)).not.toBeInTheDocument();
     });
     expect(useTimelineStore.getState().editingResourceCell).toBeNull();
     expect(useTimelineStore.getState().getActiveDocument().tasks[0].resourceOverrides).toEqual([]);
@@ -851,12 +852,12 @@ describe('URL-owned app state', () => {
     });
 
     await user.dblClick(firstCell);
-    expect(within(firstCell).getByLabelText(`Resource value for One editor task in ${weeks[0].label}`)).toBeInTheDocument();
+    expect(screen.getByLabelText(`Resource value for One editor task in ${weeks[0].label}`)).toBeInTheDocument();
 
     await user.dblClick(secondCell);
 
-    expect(within(firstCell).queryByRole('textbox')).not.toBeInTheDocument();
-    expect(within(secondCell).getByLabelText(`Resource value for One editor task in ${weeks[1].label}`)).toBeInTheDocument();
+    expect(screen.queryByLabelText(`Resource value for One editor task in ${weeks[0].label}`)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(`Resource value for One editor task in ${weeks[1].label}`)).toBeInTheDocument();
     expect(screen.getAllByRole('textbox', { name: /Resource value for One editor task/ })).toHaveLength(1);
   });
 
@@ -958,6 +959,39 @@ describe('URL-owned app state', () => {
     await user.click(await screen.findByText('Milestone A'));
 
     expect(await screen.findByText('Locally saved task')).toBeInTheDocument();
+  });
+
+  it('saves a new local snapshot when the save prompt name changes from the current saved plan', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    act(() => {
+      useTimelineStore.getState().addTask({ name: 'Original saved task' });
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.change(await screen.findByLabelText('Saved plan name'), { target: { value: 'Original snapshot' } });
+    let saveButtons = screen.getAllByRole('button', { name: 'Save' });
+    await user.click(saveButtons[saveButtons.length - 1]);
+
+    act(() => {
+      useTimelineStore.getState().addTask({ name: 'Copy-only task' });
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByLabelText('Saved plan name')).toHaveValue('Original snapshot');
+    fireEvent.change(screen.getByLabelText('Saved plan name'), { target: { value: 'Copied snapshot' } });
+    saveButtons = screen.getAllByRole('button', { name: 'Save' });
+    await user.click(saveButtons[saveButtons.length - 1]);
+
+    expect(listSavedPlans().map((plan) => plan.name).sort()).toEqual(['Copied snapshot', 'Original snapshot']);
+    expect(useTimelineStore.getState().getActiveDocument().plan.name).toBe('Copied snapshot');
+
+    await user.click(screen.getByRole('button', { name: 'Load' }));
+    expect(await screen.findByText('Original snapshot')).toBeInTheDocument();
+    expect(await screen.findAllByText('Copied snapshot')).toHaveLength(2);
   });
 
   it('deletes named local snapshots from the load dialog', async () => {
