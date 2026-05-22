@@ -251,7 +251,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 ### 4.3 Shift / Delay Handling
 - **Per-task constraint:** Set `earliestStartWeek` to prevent a task from starting before a given week (drag handle in UI or manual input).
 - **Lag on dependency:** Add `lagWeeks > 0` to insert a buffer between predecessor end and successor start.
-- **Task shift:** Select a task → shift `earliestStartWeek` by ±N weeks. Preview diff before applying.
+- **Task shift:** Select a task-week cell → Shift moves the remaining visible work from that cell onward to the right by whole or fractional weeks. This can create gaps inside the same task timeline; for example, shifting a 10-resource task by 1.5 weeks inserts one empty week before the selected cell, then schedules 5 resources in the next week before continuing at 10.
 
 ---
 
@@ -278,7 +278,8 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - **Total effort row:** Displayed below task rows. Each week shows `x/y`, where `x` is calculated effective effort for that week and `y` is raw resource allocation for that week.
 - **External dependency markers:** Expected external inputs are rendered as full-height deadline lines on the border after the due week. These lines use red/neutral/green status colors and are visually distinct from the thin blue today line. Free-text boxes are displayed in a dedicated dependency lane below the task table so they do not cover schedule cells. Where space allows, same-week dependency boxes are centered on the deadline line and stack vertically; near edges they may fall to the available side / shrink as needed instead of escaping the scrollable timeline. Compact boxes may truncate long text, with the full note shown on hover.
 - **Category totals:** The merged category cell shows compact category summary values; task-week resource totals remain visible in task cells and the total effort row.
-- **Compact toolbar:** The timeline has one compact top toolbar with `Task`, `Category`, `Dependency`, shift, CSV export, `Save`, `Load`, `Backup/restore`, and settings actions. Save/load tooltips clarify that they use local storage, and the header links back to the original GitHub repository.
+- **Compact toolbar:** The timeline has one compact top toolbar with `Task`, `Category`, `Dependency`, shift, split, CSV export, `Save`, `Load`, `Backup/restore`, and settings actions. Save/load tooltips clarify that they use local storage, Shift explains that it moves remaining work from the selected cell, Effective resources explains the adjusted/read-only view, and the header links back to the original GitHub repository.
+- **Task split:** Select a task-week cell → Split creates a second task starting at that cell. The selected cell becomes the first week of the new task. The new task keeps the original task's category, priority placement, color, max resources, notes, and other task settings, while the original task keeps the work before the split.
 - **Reordering:** Task and category side panel headers expose discreet move-up/move-down icon controls. Reordering tasks updates their priority/order in the list; reordering categories updates category order. The timeline grid itself stays free of persistent reorder controls.
 - **Focused side panel:** Clicking a task, category, dependency box, or add action opens a small right-side panel only for that item type. The panel has an `X` close control and a delete action.
 - **Keyboard delete:** With a task, category, or dependency selected, Delete removes it. If the deletion affects historical schedule/deadline data, the past-week confirmation appears before mutation.

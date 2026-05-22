@@ -55,6 +55,7 @@ export function recalculateSchedule(document) {
       tasks.some((task) => task.id === entry.taskId),
   );
   const allocatedByWeek = createManualAllocationMap([...manualEntries, ...completedEntries]);
+  const rawAllocatedByWeek = createManualAllocationMap([...manualEntries, ...completedEntries]);
   const manualEntriesByTask = groupManualEntriesByTask(manualEntries);
   const completionWeekByTask = new Map();
   const schedule = [];
@@ -84,6 +85,7 @@ export function recalculateSchedule(document) {
       planVacations: document.plan?.vacations ?? [],
       categoryById,
       allocatedByWeek,
+      rawAllocatedByWeek,
       earliestStartWeek,
       manualEntries: manualEntriesByTask.get(task.id) ?? [],
       warnings,
@@ -103,6 +105,22 @@ export function recalculateSchedule(document) {
         continue;
       }
       allocatedByWeek.set(entry.weekIndex, (allocatedByWeek.get(entry.weekIndex) ?? 0) + entry.allocatedUnits);
+      rawAllocatedByWeek.set(
+        entry.weekIndex,
+        roundAllocation(
+          (rawAllocatedByWeek.get(entry.weekIndex) ?? 0) + getRawAllocationForScheduledEntry({
+            entry,
+            task,
+            week: weeks.find((item) => item.weekIndex === entry.weekIndex),
+            firstTeam,
+            startingResourceCount,
+            weekResources: document.weekResources ?? [],
+            freedays: document.freedays ?? [],
+            planVacations: document.plan?.vacations ?? [],
+            category: categoryById.get(task.categoryId),
+          }),
+        ),
+      );
     }
 
     if (result.entries.length > 0) {
@@ -176,11 +194,14 @@ function scheduleTask(options) {
       task: options.task,
     });
     const alreadyAllocated = options.allocatedByWeek.get(week.weekIndex) ?? 0;
+    const alreadyRawAllocated = options.rawAllocatedByWeek.get(week.weekIndex) ?? 0;
     const available = Math.max(0, capacity.effectiveCapacity - alreadyAllocated);
+    const rawAvailable = Math.max(0, capacity.rawCapacity - alreadyRawAllocated);
     const taskCapacity = getTaskWeekCapacity(
       options.task,
       week.weekIndex,
       available,
+      rawAvailable,
       capacity.productivityFactor,
       capacity.taskVacationResourceLoss,
     );
@@ -247,7 +268,7 @@ function validateManualEntries(options, manualEntries) {
 
 function getWeekCapacityContext({ week, firstTeam, startingResourceCount, weekResources, freedays, planVacations, category, task }) {
   if (!firstTeam) {
-    return { effectiveCapacity: 0, productivityFactor: 0, taskVacationResourceLoss: 0 };
+    return { rawCapacity: 0, effectiveCapacity: 0, productivityFactor: 0, taskVacationResourceLoss: 0 };
   }
 
   const resourceCount = resolveWeekResourceCount(week.weekIndex, firstTeam.id, weekResources, startingResourceCount);
@@ -260,16 +281,27 @@ function getWeekCapacityContext({ week, firstTeam, startingResourceCount, weekRe
   const taskVacationDays = countTaskVacationDaysForWeek(week, task);
 
   return {
+    rawCapacity: resourceCount,
     effectiveCapacity: categoryVacationAdjusted,
     productivityFactor: resourceCount > 0 ? categoryVacationAdjusted / resourceCount : 0,
     taskVacationResourceLoss: taskVacationDays / 5,
   };
 }
 
-function getTaskWeekCapacity(task, weekIndex, available, productivityFactor = 1, taskVacationResourceLoss = 0) {
-  const maxResourceCap = task.maxResources === null || task.maxResources === undefined
-    ? Math.max(0, available - taskVacationResourceLoss)
-    : Math.min(available, getEffectiveAllocationFromRaw(task.maxResources, productivityFactor, taskVacationResourceLoss));
+function getTaskWeekCapacity(task, weekIndex, available, rawAvailable, productivityFactor = 1, taskVacationResourceLoss = 0) {
+  const rawResourceCap = getTaskRawResourceCap(task, weekIndex, rawAvailable);
+  const maxResourceCap = Math.min(
+    available,
+    getEffectiveAllocationFromRaw(rawResourceCap, productivityFactor, taskVacationResourceLoss),
+  );
+  if (rawResourceCap <= 0) {
+    return 0;
+  }
+
+  if (task.maxResources === null || task.maxResources === undefined) {
+    return maxResourceCap;
+  }
+
   const override = [...(task.resourceOverrides ?? [])]
     .filter((item) => item.weekIndex <= weekIndex)
     .sort((a, b) => b.weekIndex - a.weekIndex)[0];
@@ -282,6 +314,67 @@ function getTaskWeekCapacity(task, weekIndex, available, productivityFactor = 1,
     maxResourceCap,
     getEffectiveAllocationFromRaw(Math.max(0, Number(override.allocatedUnits) || 0), productivityFactor, taskVacationResourceLoss),
   );
+}
+
+function getTaskRawResourceCap(task, weekIndex, rawAvailable = Number.POSITIVE_INFINITY) {
+  const rawLimits = [Math.max(0, Number(rawAvailable) || 0)];
+  const override = [...(task.resourceOverrides ?? [])]
+    .filter((item) => item.weekIndex <= weekIndex)
+    .sort((a, b) => b.weekIndex - a.weekIndex)[0];
+
+  if (override) {
+    rawLimits.push(Math.max(0, Number(override.allocatedUnits) || 0));
+  }
+
+  if (task.maxResources !== null && task.maxResources !== undefined) {
+    rawLimits.push(Math.max(0, Number(task.maxResources) || 0));
+  }
+
+  return Math.min(...rawLimits);
+}
+
+function getRawAllocationForScheduledEntry({
+  entry,
+  task,
+  week,
+  firstTeam,
+  startingResourceCount,
+  weekResources,
+  freedays,
+  planVacations,
+  category,
+}) {
+  if (!week || !task || entry.isCompleted) {
+    return roundAllocation(entry.allocatedUnits ?? 0);
+  }
+
+  const capacity = getWeekCapacityContext({
+    week,
+    firstTeam,
+    startingResourceCount,
+    weekResources,
+    freedays,
+    planVacations,
+    category,
+    task,
+  });
+  const effectiveAllocation = Number(entry.allocatedUnits) || 0;
+
+  if (capacity.productivityFactor <= 0) {
+    return roundAllocation(effectiveAllocation);
+  }
+
+  const rawLimit = getTaskRawResourceCap(task, week.weekIndex);
+  const effectiveLimit = getEffectiveAllocationFromRaw(
+    rawLimit,
+    capacity.productivityFactor,
+    capacity.taskVacationResourceLoss,
+  );
+  if (Number.isFinite(rawLimit) && Math.abs(effectiveAllocation - effectiveLimit) <= 0.15) {
+    return roundAllocation(rawLimit);
+  }
+
+  return roundAllocation((effectiveAllocation + capacity.taskVacationResourceLoss) / capacity.productivityFactor);
 }
 
 function getEffectiveAllocationFromRaw(rawAllocation, productivityFactor = 1, taskVacationResourceLoss = 0) {

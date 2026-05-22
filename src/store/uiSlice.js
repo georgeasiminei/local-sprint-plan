@@ -3,6 +3,7 @@ import { isPastWeek } from '../engine/timeline.js';
 export function createUiSlice(set, get) {
   return {
     selectedTaskId: null,
+    selectedTaskWeekIndex: null,
     selectedCategoryId: null,
     selectedDependencyId: null,
     selectedExternalDependencyId: null,
@@ -14,9 +15,10 @@ export function createUiSlice(set, get) {
     pendingPastWeekEdit: null,
     undoStack: [],
     redoStack: [],
-    selectTask: (taskId) =>
+    selectTask: (taskId, weekIndex = null) =>
       set({
         selectedTaskId: taskId,
+        selectedTaskWeekIndex: weekIndex,
         selectedCategoryId: null,
         selectedDependencyId: null,
         selectedExternalDependencyId: null,
@@ -28,6 +30,7 @@ export function createUiSlice(set, get) {
       set({
         selectedCategoryId: categoryId,
         selectedTaskId: null,
+        selectedTaskWeekIndex: null,
         selectedDependencyId: null,
         selectedExternalDependencyId: null,
         selectedWeekIndex: null,
@@ -39,6 +42,7 @@ export function createUiSlice(set, get) {
         selectedDependencyId: dependencyId,
         selectedExternalDependencyId: null,
         selectedTaskId: null,
+        selectedTaskWeekIndex: null,
         selectedCategoryId: null,
         selectedWeekIndex: null,
         activePanel: 'dependency',
@@ -49,6 +53,7 @@ export function createUiSlice(set, get) {
         selectedExternalDependencyId: dependencyId,
         selectedDependencyId: null,
         selectedTaskId: null,
+        selectedTaskWeekIndex: null,
         selectedCategoryId: null,
         selectedWeekIndex: null,
         activePanel: 'dependency',
@@ -59,6 +64,7 @@ export function createUiSlice(set, get) {
       set({
         selectedWeekIndex: weekIndex,
         selectedTaskId: null,
+        selectedTaskWeekIndex: null,
         selectedCategoryId: null,
         selectedDependencyId: null,
         selectedExternalDependencyId: null,
@@ -72,6 +78,7 @@ export function createUiSlice(set, get) {
         selectedDependencyId: null,
         selectedExternalDependencyId: null,
         selectedTaskId: null,
+        selectedTaskWeekIndex: null,
         selectedCategoryId: null,
       }),
     openShiftTask: () => set({ isShiftTaskOpen: true }),
@@ -85,6 +92,7 @@ export function createUiSlice(set, get) {
         get().removeTask(taskId);
         set((state) => ({
           selectedTaskId: state.selectedTaskId === taskId ? null : state.selectedTaskId,
+          selectedTaskWeekIndex: state.selectedTaskId === taskId ? null : state.selectedTaskWeekIndex,
           isSidebarOpen: state.selectedTaskId === taskId ? false : state.isSidebarOpen,
         }));
       };
@@ -114,6 +122,7 @@ export function createUiSlice(set, get) {
         set((state) => ({
           selectedExternalDependencyId:
             state.selectedExternalDependencyId === dependencyId ? null : state.selectedExternalDependencyId,
+          selectedTaskWeekIndex: null,
           isSidebarOpen: state.selectedExternalDependencyId === dependencyId ? false : state.isSidebarOpen,
         }));
       };

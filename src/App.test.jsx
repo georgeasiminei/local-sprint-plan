@@ -144,12 +144,16 @@ describe('URL-owned app state', () => {
 
     expect(screen.queryByRole('checkbox', { name: 'Select Shift me' })).not.toBeInTheDocument();
     await user.click(await screen.findByText('Shift me'));
+    expect(shiftButton).toBeDisabled();
+
+    const document = useTimelineStore.getState().getActiveDocument();
+    await user.click(screen.getByRole('button', { name: `Set Shift me resources in ${document.weeks[0].label}` }));
     expect(shiftButton).toBeEnabled();
 
     await user.click(shiftButton);
     expect(await screen.findByText('Shift task')).toBeInTheDocument();
     expect(screen.getAllByText('Shift me')).toHaveLength(2);
-    expect(screen.queryByText(/Select a task in the timeline first\./i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Select a task cell in the timeline first\./i)).not.toBeInTheDocument();
   });
 
   it('lets settings dimensions be cleared and typed before committing', async () => {
@@ -1022,6 +1026,7 @@ function resetStore() {
     scheduleWarnings: [],
     hasAppliedAutoCompletion: false,
     selectedTaskId: null,
+    selectedTaskWeekIndex: null,
     selectedCategoryId: null,
     selectedDependencyId: null,
     isShiftTaskOpen: false,

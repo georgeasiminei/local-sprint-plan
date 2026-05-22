@@ -25,6 +25,7 @@ export function createCategoriesSlice(set, get) {
       set({
         selectedCategoryId: id,
         selectedTaskId: null,
+        selectedTaskWeekIndex: null,
         selectedDependencyId: null,
         selectedExternalDependencyId: null,
         selectedWeekIndex: null,

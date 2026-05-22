@@ -127,6 +127,7 @@ function TaskGridRow({
   weekColumnWidth,
 }) {
   const selectedTaskId = useTimelineStore((state) => state.selectedTaskId);
+  const selectedTaskWeekIndex = useTimelineStore((state) => state.selectedTaskWeekIndex);
   const isSelected = selectedTaskId === task.id;
   const taskSchedule = schedule.filter((item) => item.taskId === task.id);
   const taskDependencies = getDependenciesForEntity(document, 'task', task.id);
@@ -198,6 +199,7 @@ function TaskGridRow({
             const allocation = allocationView === 'effective'
               ? getEffectiveAllocationForEntry(entry)
               : getResourceAllocationForEntry(document, task, week, entry);
+            const isSelectedWeek = isSelected && selectedTaskWeekIndex === week.weekIndex;
             return (
               <TaskCell
                 key={week.id}
@@ -210,6 +212,7 @@ function TaskGridRow({
                 isOverride={isOverride}
                 isLocked={task.completed || allocationView === 'effective'}
                 isEditable={allocationView === 'resource'}
+                isSelected={isSelectedWeek}
                 cellColor={entry?.allocatedUnits ? rowColor : null}
               />
             );

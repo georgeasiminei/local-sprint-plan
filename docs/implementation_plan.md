@@ -22,6 +22,8 @@ Build a local-only React planning app whose single active plan is owned by the b
 - Week and task-completion boundaries use local calendar dates, matching the date-only ISO-week UI rather than treating those labels as UTC instants.
 - `Save` and `Load` manage named manual snapshots in `localStorage`; saving always prompts for a name and updates the active plan name to match, and loading a named snapshot applies that saved name to the active plan.
 - Task resource edits are source rules that apply from the edited week onward.
+- Shift works from the selected task-week cell. It freezes the current task allocation as manual rows, then moves the selected cell and later work to the right by whole or fractional weeks, allowing gaps inside a task timeline.
+- Split works from the selected task-week cell. It creates a second task with the same settings and moves the selected cell and later work to that new task.
 - Week resource edits live in the focused week panel. They apply from the selected week onward by default, with an "apply only to this week" checkbox for one-week changes.
 - Task/category colors render only in scheduled cells with allocated resources.
 - Working days default to 5 and are edited from the week panel. A four-day holiday week contributes `resourceCount * 4 / 5` capacity while leaving the raw total capacity row unchanged, and that productivity factor scales every task allocation/cap in the affected week.

@@ -251,6 +251,38 @@ describe('recalculateSchedule', () => {
     ]);
   });
 
+  it('does not start another task when vacation-adjusted tasks have exhausted raw resources', () => {
+    const document = createPlanDocument({
+      name: 'Raw capacity exhaustion fixture',
+      startWeek: 1,
+      startingResourceCount: 13,
+    });
+    document.categories = [
+      {
+        id: 'category-1',
+        name: 'Delivery',
+        order: 1,
+        color: '#e0f2fe',
+        vacations: [{ weekIndex: 1, dayCount: 1 }],
+      },
+    ];
+    document.tasks = [
+      { id: 'task-1', categoryId: 'category-1', name: 'Five resource task', priority: 1, estimateWeeks: 20, maxResources: 5 },
+      { id: 'task-2', categoryId: 'category-1', name: 'Eight resource task', priority: 2, estimateWeeks: 20, maxResources: 8 },
+      { id: 'task-3', categoryId: null, name: 'Should wait', priority: 3, estimateWeeks: 1, maxResources: null },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 4.9, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 7.9, isManual: false },
+    ]);
+    expect(result.schedule).toContainEqual(
+      expect.objectContaining({ taskId: 'task-3', weekIndex: 3, allocatedUnits: 1 }),
+    );
+  });
+
   it('applies task vacation reductions only to the selected task', () => {
     const document = createPlanDocument({
       name: 'Task vacation fixture',
