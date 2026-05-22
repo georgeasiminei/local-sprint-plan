@@ -26,6 +26,16 @@ export function createUiSlice(set, get) {
         activePanel: 'task',
         isSidebarOpen: true,
       }),
+    selectTaskCell: (taskId, weekIndex) =>
+      set({
+        selectedTaskId: taskId,
+        selectedTaskWeekIndex: weekIndex,
+        selectedCategoryId: null,
+        selectedDependencyId: null,
+        selectedExternalDependencyId: null,
+        selectedWeekIndex: null,
+        activePanel: 'task',
+      }),
     selectCategory: (categoryId) =>
       set({
         selectedCategoryId: categoryId,

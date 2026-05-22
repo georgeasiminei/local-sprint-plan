@@ -148,7 +148,7 @@ describe('URL-owned app state', () => {
 
     const document = useTimelineStore.getState().getActiveDocument();
     await user.click(screen.getByRole('button', { name: `Set Shift me resources in ${document.weeks[0].label}` }));
-    expect(shiftButton).toBeEnabled();
+    await waitFor(() => expect(shiftButton).toBeEnabled());
 
     await user.click(shiftButton);
     expect(await screen.findByText('Shift task')).toBeInTheDocument();
@@ -282,7 +282,7 @@ describe('URL-owned app state', () => {
     expect(useTimelineStore.getState().getActiveDocument().externalDependencies).toHaveLength(0);
   });
 
-  it('opens the task panel when a task cell is clicked', async () => {
+  it('selects a task cell without opening the editor or changing data', async () => {
     const user = userEvent.setup();
 
     render(<App />);
@@ -297,8 +297,10 @@ describe('URL-owned app state', () => {
 
     await user.click(screen.getByRole('button', { name: `Set Cell task resources in ${weekLabel}` }));
 
-    expect(await screen.findByText('Name')).toBeInTheDocument();
-    expect(screen.getByText('Cell task')).toBeInTheDocument();
+    expect(useTimelineStore.getState().selectedTaskId).toBe(document.tasks[0].id);
+    expect(useTimelineStore.getState().selectedTaskWeekIndex).toBe(document.weeks[0]?.weekIndex);
+    expect(screen.queryByLabelText(`Resource value for Cell task in ${weekLabel}`)).not.toBeInTheDocument();
+    expect(useTimelineStore.getState().getActiveDocument().tasks[0].resourceOverrides).toEqual([]);
   });
 
   it('defaults external dependency due week to the selected week', async () => {
@@ -726,7 +728,55 @@ describe('URL-owned app state', () => {
       name: `Set View mode task resources in ${firstWeek.label}`,
     });
     await user.click(editableCell);
+    expect(within(editableCell).queryByRole('textbox')).not.toBeInTheDocument();
+    await user.dblClick(editableCell);
     expect(within(editableCell).getByRole('textbox')).toHaveValue('2');
+  });
+
+  it('selects resource cells without creating overrides and edits them explicitly', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    act(() => {
+      const store = useTimelineStore.getState();
+      const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+      store.updatePlanSettings({ startYear: weekYear, startWeek: weekNumber, startingResourceCount: 5 });
+      store.addTask({
+        name: 'Explicit edit task',
+        estimateWeeks: 10,
+      });
+    });
+
+    const firstWeek = useTimelineStore.getState().getActiveDocument().weeks[0];
+    const cell = await screen.findByRole('button', {
+      name: `Set Explicit edit task resources in ${firstWeek.label}`,
+    });
+
+    await user.click(cell);
+    await waitFor(() => expect(useTimelineStore.getState().selectedTaskWeekIndex).toBe(firstWeek.weekIndex));
+    expect(useTimelineStore.getState().getActiveDocument().tasks[0].resourceOverrides).toEqual([]);
+    expect(within(cell).queryByRole('textbox')).not.toBeInTheDocument();
+
+    await user.dblClick(cell);
+    const input = within(cell).getByLabelText(`Resource value for Explicit edit task in ${firstWeek.label}`);
+    await user.clear(input);
+    await user.type(input, '4');
+    await user.click(within(cell).getByRole('button', { name: 'Set' }));
+
+    await waitFor(() => {
+      expect(useTimelineStore.getState().getActiveDocument().tasks[0].resourceOverrides).toEqual([
+        { weekIndex: firstWeek.weekIndex, allocatedUnits: 4 },
+      ]);
+    });
+
+    await user.dblClick(cell);
+    await user.click(within(cell).getByRole('button', { name: 'Unset' }));
+
+    await waitFor(() => {
+      expect(useTimelineStore.getState().getActiveDocument().tasks[0].resourceOverrides).toEqual([]);
+    });
   });
 
   it('edits working days and plan vacation person-days from the week panel', async () => {
