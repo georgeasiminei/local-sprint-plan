@@ -1,6 +1,7 @@
 import { CheckCircle2, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useTimelineStore } from '../../store/index.js';
 import { getEffectiveAllocationForEntry, getResourceAllocationForEntry } from '../../engine/allocationDisplay.js';
+import { findTaskShiftAtWeek } from '../../engine/taskTimelineEdits.js';
 import { formatNumber } from '../../utils/format.js';
 import TaskCell from './TaskCell.jsx';
 import {
@@ -199,6 +200,7 @@ function TaskGridRow({
             const allocation = allocationView === 'effective'
               ? getEffectiveAllocationForEntry(entry)
               : getResourceAllocationForEntry(document, task, week, entry);
+            const shiftRule = findTaskShiftAtWeek(task, week.weekIndex);
             const isSelectedWeek = isSelected && selectedTaskWeekIndex === week.weekIndex;
             return (
               <TaskCell
@@ -213,6 +215,7 @@ function TaskGridRow({
                 isLocked={task.completed || allocationView === 'effective'}
                 isEditable={allocationView === 'resource'}
                 isSelected={isSelectedWeek}
+                shiftRule={shiftRule}
                 cellColor={entry?.allocatedUnits ? rowColor : null}
               />
             );

@@ -83,6 +83,7 @@ export function compactPlanDocument(document) {
         compactRows(task.resourceOverrides, (override) => [override.weekIndex, override.allocatedUnits]),
         compactCompletedIntervals(task.completedIntervals),
         compactRows(task.vacations, (vacation) => [vacation.weekIndex, vacation.dayCount]),
+        compactShiftRules(task.shiftRules),
       ]),
     ),
     compactRows(document.dependencies, (dependency) =>
@@ -161,6 +162,7 @@ export function expandCompactPlanDocument(compactDocument) {
         allocatedUnits: value,
       })),
       vacations: expandWeekValuePairs(task[10]).map(({ weekIndex, value }) => ({ weekIndex, dayCount: value })),
+      shiftRules: expandShiftRules(task[11]),
       ...(completedIntervals.length > 0
         ? {
             completed: true,
@@ -369,6 +371,38 @@ function compactCompletedIntervals(intervals = []) {
   });
 }
 
+function compactShiftRules(shifts = []) {
+  return compactRows(shifts, (shift) =>
+    trimArray([
+      shift.id || null,
+      shift.anchorWeekIndex,
+      shift.weekDelta,
+      shift.firstShiftedWeek,
+      compactRows(shift.sourceEntries, (entry) =>
+        trimArray([entry.weekIndex, entry.allocatedUnits, entry.rawAllocatedUnits ?? null]),
+      ),
+    ]),
+  );
+}
+
+function expandShiftRules(rows = []) {
+  return (rows ?? []).map((row = [], index) => ({
+    id: row[0] ?? `shift-${row[1] ?? index + 1}`,
+    anchorWeekIndex: row[1],
+    weekDelta: row[2] ?? 0,
+    firstShiftedWeek: row[3] ?? Math.floor((row[1] ?? 0) + (row[2] ?? 0)),
+    sourceEntries: (row[4] ?? [])
+      .map((entry = []) =>
+        trimObject({
+          weekIndex: entry[0],
+          allocatedUnits: entry[1] ?? 0,
+          rawAllocatedUnits: entry[2] ?? undefined,
+        }),
+      )
+      .filter((entry) => Number.isFinite(entry.weekIndex) && Number(entry.allocatedUnits) > 0),
+  }));
+}
+
 function expandCompletedIntervals(rows = []) {
   return (rows ?? []).map((row = []) =>
     row.length <= 2
@@ -421,6 +455,10 @@ async function decodeCompressedPayload(payload) {
   } catch (error) {
     throw new Error(`URL state is not valid JSON. ${error.message}`);
   }
+}
+
+function trimObject(object) {
+  return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined && value !== null));
 }
 
 async function compressBytes(bytes) {

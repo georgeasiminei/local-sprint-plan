@@ -1,6 +1,6 @@
 import { roundToTenths } from '../utils/numbers.js';
 
-export function shiftTaskRemainder(document, taskId, anchorWeekIndex, weekDelta = 0) {
+export function shiftTaskRemainder(document, taskId, anchorWeekIndex, weekDelta = 0, shiftId = null) {
   const task = (document.tasks ?? []).find((item) => item.id === taskId);
   const delta = Math.max(0, roundToTenths(Number(weekDelta) || 0));
   const anchor = Number(anchorWeekIndex);
@@ -9,26 +9,77 @@ export function shiftTaskRemainder(document, taskId, anchorWeekIndex, weekDelta 
     return document;
   }
 
+  const existingShift = shiftId ? (task.shiftRules ?? []).find((shift) => shift.id === shiftId) : null;
   const taskEntries = getTaskEntries(document, taskId);
   const beforeEntries = taskEntries.filter((entry) => entry.weekIndex < anchor);
-  const remainingEntries = taskEntries.filter((entry) => entry.weekIndex >= anchor);
+  const remainingEntries = existingShift ? normalizeShiftEntries(existingShift.sourceEntries) : taskEntries.filter((entry) => entry.weekIndex >= anchor);
 
   if (remainingEntries.length === 0) {
     return document;
   }
 
+  const shiftedEntries = shiftEntriesByWeeks(remainingEntries, delta);
+  const nextShift = {
+    id: existingShift?.id ?? createShiftId(task.shiftRules ?? [], anchor),
+    anchorWeekIndex: anchor,
+    weekDelta: delta,
+    firstShiftedWeek: shiftedEntries[0]?.weekIndex ?? getFirstShiftedWeek(anchor, delta),
+    sourceEntries: normalizeShiftEntries(remainingEntries),
+  };
+  const nextShiftRules = [
+    ...(task.shiftRules ?? []).filter((shift) => shift.id !== nextShift.id),
+    nextShift,
+  ].sort((a, b) => a.anchorWeekIndex - b.anchorWeekIndex);
   const nextTaskEntries = [
     ...beforeEntries.map((entry) => toManualEntry(entry, taskId)),
-    ...shiftEntriesByWeeks(remainingEntries, delta).map((entry) => toManualEntry(entry, taskId)),
+    ...shiftedEntries.map((entry) => toManualEntry(entry, taskId)),
   ];
 
   return {
     ...document,
+    tasks: (document.tasks ?? []).map((item) => (item.id === taskId ? { ...item, shiftRules: nextShiftRules } : item)),
     schedule: sortSchedule([
       ...(document.schedule ?? []).filter((entry) => entry.taskId !== taskId),
       ...nextTaskEntries,
     ]),
   };
+}
+
+export function deleteTaskShift(document, taskId, shiftId) {
+  const task = (document.tasks ?? []).find((item) => item.id === taskId);
+  const shift = (task?.shiftRules ?? []).find((item) => item.id === shiftId);
+
+  if (!task || !shift) {
+    return document;
+  }
+
+  const taskEntries = getTaskEntries(document, taskId);
+  const beforeEntries = taskEntries.filter((entry) => entry.weekIndex < shift.anchorWeekIndex);
+  const restoredEntries = [
+    ...beforeEntries.map((entry) => toManualEntry(entry, taskId)),
+    ...normalizeShiftEntries(shift.sourceEntries).map((entry) => toManualEntry(entry, taskId)),
+  ];
+  const nextShiftRules = (task.shiftRules ?? []).filter((item) => item.id !== shift.id);
+
+  return {
+    ...document,
+    tasks: (document.tasks ?? []).map((item) =>
+      item.id === taskId
+        ? {
+            ...item,
+            ...(nextShiftRules.length > 0 ? { shiftRules: nextShiftRules } : { shiftRules: undefined }),
+          }
+        : item,
+    ),
+    schedule: sortSchedule([
+      ...(document.schedule ?? []).filter((entry) => entry.taskId !== taskId),
+      ...restoredEntries,
+    ]),
+  };
+}
+
+export function findTaskShiftAtWeek(task, weekIndex) {
+  return (task?.shiftRules ?? []).find((shift) => shift.firstShiftedWeek === weekIndex) ?? null;
 }
 
 export function splitTaskAtWeek(document, taskId, anchorWeekIndex, newTaskId) {
@@ -59,6 +110,7 @@ export function splitTaskAtWeek(document, taskId, anchorWeekIndex, newTaskId) {
     earliestStartWeek: anchor,
     completed: undefined,
     completedIntervals: undefined,
+    shiftRules: undefined,
   };
   const firstTask = {
     ...task,
@@ -66,6 +118,7 @@ export function splitTaskAtWeek(document, taskId, anchorWeekIndex, newTaskId) {
     calcWeeks: 0,
     completed: undefined,
     completedIntervals: undefined,
+    shiftRules: undefined,
   };
   const nextTasks = [
     ...document.tasks.slice(0, taskIndex),
@@ -129,12 +182,55 @@ function shiftEntriesByWeeks(entries, weekDelta) {
 }
 
 function toManualEntry(entry, taskId) {
+  const allocatedUnits = roundToTenths(entry.allocatedUnits);
+  const rawAllocatedUnits = entry.rawAllocatedUnits === null || entry.rawAllocatedUnits === undefined
+    ? allocatedUnits
+    : roundToTenths(entry.rawAllocatedUnits);
+
   return {
     taskId,
     weekIndex: entry.weekIndex,
-    allocatedUnits: roundToTenths(entry.allocatedUnits),
+    allocatedUnits,
+    ...(rawAllocatedUnits !== allocatedUnits ? { rawAllocatedUnits } : {}),
     isManual: true,
   };
+}
+
+function normalizeShiftEntries(entries = []) {
+  return entries
+    .map((entry) => {
+      const allocatedUnits = roundToTenths(entry.allocatedUnits);
+      const rawAllocatedUnits = entry.rawAllocatedUnits === null || entry.rawAllocatedUnits === undefined
+        ? allocatedUnits
+        : roundToTenths(entry.rawAllocatedUnits);
+
+      return {
+        weekIndex: Number(entry.weekIndex),
+        allocatedUnits,
+        ...(rawAllocatedUnits !== allocatedUnits ? { rawAllocatedUnits } : {}),
+      };
+    })
+    .filter((entry) => Number.isFinite(entry.weekIndex) && entry.allocatedUnits > 0)
+    .sort((a, b) => a.weekIndex - b.weekIndex);
+}
+
+function getFirstShiftedWeek(anchor, delta) {
+  return Math.floor(anchor + delta);
+}
+
+function createShiftId(shifts, anchor) {
+  const baseId = `shift-${anchor}`;
+  const existingIds = new Set(shifts.map((shift) => shift.id));
+  if (!existingIds.has(baseId)) {
+    return baseId;
+  }
+
+  let suffix = 2;
+  while (existingIds.has(`${baseId}-${suffix}`)) {
+    suffix += 1;
+  }
+
+  return `${baseId}-${suffix}`;
 }
 
 function sumAllocations(entries) {

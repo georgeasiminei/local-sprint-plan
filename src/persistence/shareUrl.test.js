@@ -266,6 +266,50 @@ describe('URL plan payloads', () => {
     expect(decoded.tasks[0].vacations).toEqual([{ weekIndex: 3, dayCount: 2 }]);
   });
 
+  it('round trips reversible task shift rules in compact URL state', async () => {
+    const document = createPlanFixture({
+      tasks: [
+        {
+          id: 'task-1',
+          name: 'Shifted task',
+          priority: 1,
+          estimateWeeks: 20,
+          shiftRules: [
+            {
+              id: 'shift-3',
+              anchorWeekIndex: 3,
+              weekDelta: 1.5,
+              firstShiftedWeek: 4,
+              sourceEntries: [
+                { weekIndex: 3, allocatedUnits: 5 },
+                { weekIndex: 4, allocatedUnits: 5, rawAllocatedUnits: 6 },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const compact = compactPlanDocument(document);
+    const decoded = await decodePlanFromHashPayload(await encodePlanToHashPayload(document));
+
+    expect(compact[2][0][11]).toEqual([
+      ['shift-3', 3, 1.5, 4, [[3, 5], [4, 5, 6]]],
+    ]);
+    expect(decoded.tasks[0].shiftRules).toEqual([
+      {
+        id: 'shift-3',
+        anchorWeekIndex: 3,
+        weekDelta: 1.5,
+        firstShiftedWeek: 4,
+        sourceEntries: [
+          { weekIndex: 3, allocatedUnits: 5 },
+          { weekIndex: 4, allocatedUnits: 5, rawAllocatedUnits: 6 },
+        ],
+      },
+    ]);
+  });
+
   it('keeps large encoded plans compact relative to runtime JSON', async () => {
     const document = createPlanFixture({
       categories: Array.from({ length: 6 }, (_, index) => ({

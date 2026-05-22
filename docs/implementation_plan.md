@@ -23,7 +23,7 @@ Build a local-only React planning app whose single active plan is owned by the b
 - `Save` and `Load` manage named manual snapshots in `localStorage`; saving always prompts for a name, updates the current saved snapshot when the name is unchanged, creates a new snapshot when the name changes, and applies the submitted name to the active plan. Loading a named snapshot applies that saved name to the active plan.
 - Task resource edits are source rules that apply from the edited week onward.
 - Task cells are selection-only on single click. Double-click opens one compact 2-by-2 Set/Unset/cancel editor so blur, clicking elsewhere, or accidental selection cannot create a resource override.
-- Shift works from the selected task-week cell. It freezes the current task allocation as manual rows, then moves the selected cell and later work to the right by whole or fractional weeks, allowing gaps inside a task timeline.
+- Shift works from the selected task-week cell. It freezes the current task allocation as manual rows, stores a reversible shift rule containing the original remaining work, then moves the selected cell and later work to the right by whole or fractional weeks, allowing gaps inside a task timeline. The first shifted week is marked; selecting it opens Shift in edit/delete mode.
 - Split works from the selected task-week cell. It creates a second task with the same settings and moves the selected cell and later work to that new task.
 - Week resource edits live in the focused week panel. They apply from the selected week onward by default, with an "apply only to this week" checkbox for one-week changes.
 - Task/category colors render only in scheduled cells with allocated resources.

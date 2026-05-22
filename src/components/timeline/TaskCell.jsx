@@ -18,6 +18,7 @@ export default function TaskCell({
   isLocked,
   isEditable = true,
   isSelected = false,
+  shiftRule = null,
   cellColor,
 }) {
   const [draftValue, setDraftValue] = useState('');
@@ -165,6 +166,13 @@ export default function TaskCell({
         }
       }}
     >
+      {shiftRule ? (
+        <span
+          aria-label={`Shift starts here: ${formatShiftDelta(shiftRule.weekDelta)}`}
+          className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-violet-600"
+          title={`Shift starts here: ${formatShiftDelta(shiftRule.weekDelta)}`}
+        />
+      ) : null}
       {isEditing && editorPosition
         ? createPortal(
             <div
@@ -237,6 +245,12 @@ export default function TaskCell({
       )}
     </div>
   );
+}
+
+function formatShiftDelta(value) {
+  const numeric = Number(value) || 0;
+  const label = Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(1);
+  return `${label} ${numeric === 1 ? 'week' : 'weeks'}`;
 }
 
 function getCellLabel(taskName, week, canEdit) {
