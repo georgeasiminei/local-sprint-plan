@@ -157,6 +157,37 @@ describe('URL-owned app state', () => {
     expect(screen.queryByText(/Select a task cell in the timeline first\./i)).not.toBeInTheDocument();
   });
 
+  it('opens an existing shift for editing from its first shifted week', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    act(() => {
+      const store = useTimelineStore.getState();
+      const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+      store.updatePlanSettings({ startYear: weekYear, startWeek: weekNumber, startingResourceCount: 10 });
+      store.addTask({ name: 'Reversible shift', estimateWeeks: 20, maxResources: 10 });
+    });
+
+    let document = useTimelineStore.getState().getActiveDocument();
+    const shiftButton = screen.getByRole('button', { name: 'Shift selected task by weeks' });
+    await user.click(await screen.findByRole('button', { name: `Set Reversible shift resources in ${document.weeks[0].label}` }));
+    await user.click(shiftButton);
+    await user.click(await screen.findByRole('button', { name: 'Apply shift' }));
+
+    document = useTimelineStore.getState().getActiveDocument();
+    const shiftedWeek = document.weeks[1];
+    expect(screen.getByLabelText('Shift starts here: 1 week')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: `Set Reversible shift resources in ${shiftedWeek.label}` }));
+    await user.click(shiftButton);
+
+    expect(await screen.findByText('Edit shift')).toBeInTheDocument();
+    expect(screen.getByLabelText('Shift remaining work by weeks')).toHaveValue('1');
+    expect(screen.getByRole('button', { name: 'Delete shift' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Update shift' })).toBeInTheDocument();
+  });
+
   it('lets settings dimensions be cleared and typed before committing', async () => {
     const user = userEvent.setup();
 

@@ -252,7 +252,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 ### 4.3 Shift / Delay Handling
 - **Per-task constraint:** Set `earliestStartWeek` to prevent a task from starting before a given week (drag handle in UI or manual input).
 - **Lag on dependency:** Add `lagWeeks > 0` to insert a buffer between predecessor end and successor start.
-- **Task shift:** Select a task-week cell → Shift moves the remaining visible work from that cell onward to the right by whole or fractional weeks. This can create gaps inside the same task timeline; for example, shifting a 10-resource task by 1.5 weeks inserts one empty week before the selected cell, then schedules 5 resources in the next week before continuing at 10.
+- **Task shift:** Select a task-week cell → Shift moves the remaining visible work from that cell onward to the right by whole or fractional weeks. This can create gaps inside the same task timeline; for example, shifting a 10-resource task by 1.5 weeks inserts one empty week before the selected cell, then schedules 5 resources in the next week before continuing at 10. Shifts are stored as reversible rules with their original remaining work. The first shifted week is marked in the timeline; selecting that marked week and opening Shift lets the user update the shift length or delete the shift to restore the original remainder.
 
 ---
 
@@ -322,7 +322,8 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 
 ### 5.6 Shift Task Modal
 - Trigger: click a task row to select it → "Shift" button
-- Input: shift by N weeks (positive = delay, negative = accelerate)
+- Input: shift by N weeks (positive = delay)
+- Existing shift: when the selected cell is the first shifted week, the modal edits that stored shift and includes a delete action
 - Preview: shows before/after start week for each affected task
 - Confirm / Cancel
 

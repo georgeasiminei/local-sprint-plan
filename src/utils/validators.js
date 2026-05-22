@@ -194,6 +194,42 @@ function validateTasks(tasks, categoryIds, errors) {
         errors.push(`Task ${task.id} completed interval rawAllocatedUnits must be a non-negative number.`);
       }
     }
+
+    for (const shift of task.shiftRules ?? []) {
+      if (shift.id !== undefined && typeof shift.id !== 'string') {
+        errors.push(`Task ${task.id} shift id must be a string.`);
+      }
+
+      if (!isIntegerAtLeast(shift.anchorWeekIndex, 1)) {
+        errors.push(`Task ${task.id} shift anchorWeekIndex must be a positive integer.`);
+      }
+
+      if (!isNumberAtLeast(shift.weekDelta, 0)) {
+        errors.push(`Task ${task.id} shift weekDelta must be a non-negative number.`);
+      }
+
+      if (!isIntegerAtLeast(shift.firstShiftedWeek, 1)) {
+        errors.push(`Task ${task.id} shift firstShiftedWeek must be a positive integer.`);
+      }
+
+      for (const entry of shift.sourceEntries ?? []) {
+        if (!isIntegerAtLeast(entry.weekIndex, 1)) {
+          errors.push(`Task ${task.id} shift source entry weekIndex must be a positive integer.`);
+        }
+
+        if (!isNumberAtLeast(entry.allocatedUnits, 0)) {
+          errors.push(`Task ${task.id} shift source entry allocatedUnits must be a non-negative number.`);
+        }
+
+        if (
+          entry.rawAllocatedUnits !== null &&
+          entry.rawAllocatedUnits !== undefined &&
+          !isNumberAtLeast(entry.rawAllocatedUnits, 0)
+        ) {
+          errors.push(`Task ${task.id} shift source entry rawAllocatedUnits must be a non-negative number.`);
+        }
+      }
+    }
   }
 }
 
