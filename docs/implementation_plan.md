@@ -38,6 +38,7 @@ Build a local-only React planning app whose single active plan is owned by the b
 - Numeric entry uses plain edit boxes rather than browser steppers.
 - Estimates and resource values are normalized to one decimal place.
 - The timeline has a checkbox to switch between editable resource allocation view and read-only effective resource view. The total effort row shows effective allocation/resource allocation.
+- Computed schedule rows carry effective allocation plus raw allocation when those differ, so raw totals stay stable at full capacity even when effective allocations are rounded. Completed task intervals preserve the same raw/effective distinction and continue to respect the view toggle.
 - Task and category side panel headers expose discreet up/down icon controls for reordering the timeline list without cluttering the grid.
 - Selecting a task, category, or dependency and pressing Delete removes it, with past-week confirmation when historical schedule/deadline data is affected.
 

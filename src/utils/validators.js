@@ -185,6 +185,14 @@ function validateTasks(tasks, categoryIds, errors) {
       if (!isNumberAtLeast(interval.allocatedUnits, 0)) {
         errors.push(`Task ${task.id} completed interval allocatedUnits must be a non-negative number.`);
       }
+
+      if (
+        interval.rawAllocatedUnits !== null &&
+        interval.rawAllocatedUnits !== undefined &&
+        !isNumberAtLeast(interval.rawAllocatedUnits, 0)
+      ) {
+        errors.push(`Task ${task.id} completed interval rawAllocatedUnits must be a non-negative number.`);
+      }
     }
   }
 }

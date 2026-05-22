@@ -67,7 +67,7 @@ describe('recalculateSchedule', () => {
 
     expect(result.schedule).toEqual([
       { taskId: 'task-1', weekIndex: 1, allocatedUnits: 4, isManual: false },
-      { taskId: 'task-1', weekIndex: 2, allocatedUnits: 1.2, isManual: false },
+      { taskId: 'task-1', weekIndex: 2, allocatedUnits: 1.2, rawAllocatedUnits: 2, isManual: false },
       { taskId: 'task-1', weekIndex: 3, allocatedUnits: 1.8, isManual: false },
     ]);
   });
@@ -106,8 +106,8 @@ describe('recalculateSchedule', () => {
     const result = recalculateSchedule(document);
 
     expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
-      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.6, isManual: false },
-      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 2.4, isManual: false },
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.6, rawAllocatedUnits: 2, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 2.4, rawAllocatedUnits: 3, isManual: false },
     ]);
   });
 
@@ -170,7 +170,7 @@ describe('recalculateSchedule', () => {
     const result = recalculateSchedule(document);
 
     expect(result.schedule).toEqual([
-      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 3, isManual: false },
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 3, rawAllocatedUnits: 4, isManual: false },
       { taskId: 'task-1', weekIndex: 2, allocatedUnits: 4, isManual: false },
     ]);
   });
@@ -198,7 +198,7 @@ describe('recalculateSchedule', () => {
     const result = recalculateSchedule(document);
 
     expect(result.schedule).toEqual([
-      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 2, isManual: false },
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 2, rawAllocatedUnits: 4, isManual: false },
       { taskId: 'task-1', weekIndex: 2, allocatedUnits: 2, isManual: false },
     ]);
   });
@@ -218,8 +218,8 @@ describe('recalculateSchedule', () => {
     const result = recalculateSchedule(document);
 
     expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
-      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.6, isManual: false },
-      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 2.4, isManual: false },
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.6, rawAllocatedUnits: 2, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 2.4, rawAllocatedUnits: 3, isManual: false },
     ]);
   });
 
@@ -246,7 +246,7 @@ describe('recalculateSchedule', () => {
     const result = recalculateSchedule(document);
 
     expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
-      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.6, isManual: false },
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.6, rawAllocatedUnits: 2, isManual: false },
       { taskId: 'task-2', weekIndex: 1, allocatedUnits: 3, isManual: false },
     ]);
   });
@@ -275,12 +275,36 @@ describe('recalculateSchedule', () => {
     const result = recalculateSchedule(document);
 
     expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
-      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 4.9, isManual: false },
-      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 7.9, isManual: false },
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 4.9, rawAllocatedUnits: 5, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 7.9, rawAllocatedUnits: 8, isManual: false },
     ]);
     expect(result.schedule).toContainEqual(
       expect.objectContaining({ taskId: 'task-3', weekIndex: 3, allocatedUnits: 1 }),
     );
+  });
+
+  it('tracks raw allocation separately when effective rounding would show a partial raw total', () => {
+    const document = createPlanDocument({
+      name: 'Raw total fixture',
+      startWeek: 1,
+      startingResourceCount: 13,
+    });
+    document.plan.vacations = [{ weekIndex: 1, dayCount: 20 }];
+    document.tasks = [
+      { id: 'task-1', categoryId: null, name: 'Two raw resources', priority: 1, estimateWeeks: 10, maxResources: 2 },
+      { id: 'task-2', categoryId: null, name: 'Three raw resources', priority: 2, estimateWeeks: 10, maxResources: 3 },
+      { id: 'task-3', categoryId: null, name: 'Remaining raw resources', priority: 3, estimateWeeks: 5.5, maxResources: null },
+    ];
+
+    const result = recalculateSchedule(document);
+    const weekOneEntries = result.schedule.filter((entry) => entry.weekIndex === 1);
+
+    expect(weekOneEntries).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1.4, rawAllocatedUnits: 2, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 2.1, rawAllocatedUnits: 3, isManual: false },
+      { taskId: 'task-3', weekIndex: 1, allocatedUnits: 5.5, rawAllocatedUnits: 8, isManual: false },
+    ]);
+    expect(weekOneEntries.reduce((total, entry) => total + (entry.rawAllocatedUnits ?? entry.allocatedUnits), 0)).toBe(13);
   });
 
   it('applies task vacation reductions only to the selected task', () => {
@@ -305,7 +329,7 @@ describe('recalculateSchedule', () => {
     const result = recalculateSchedule(document);
 
     expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
-      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1, isManual: false },
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 1, rawAllocatedUnits: 2, isManual: false },
       { taskId: 'task-2', weekIndex: 1, allocatedUnits: 3, isManual: false },
     ]);
   });

@@ -59,4 +59,32 @@ describe('allocation display values', () => {
       }),
     ).toBe(2);
   });
+
+  it('uses stored raw allocation for completed entries in resource allocation view', () => {
+    const document = createPlanDocument({ startWeek: 1, startingResourceCount: 4 });
+    const week = document.weeks[0];
+    document.plan.vacations = [{ weekIndex: week.weekIndex, dayCount: 5 }];
+    document.tasks = [
+      {
+        id: 'task-1',
+        name: 'Completed task',
+        priority: 1,
+        estimateWeeks: 10,
+        completed: true,
+        completedIntervals: [
+          { startWeek: week.weekIndex, endWeek: week.weekIndex, allocatedUnits: 2.4, rawAllocatedUnits: 3 },
+        ],
+      },
+    ];
+
+    expect(
+      getResourceAllocationForEntry(document, document.tasks[0], week, {
+        taskId: 'task-1',
+        weekIndex: week.weekIndex,
+        allocatedUnits: 2.4,
+        rawAllocatedUnits: 3,
+        isCompleted: true,
+      }),
+    ).toBe(3);
+  });
 });

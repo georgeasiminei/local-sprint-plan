@@ -355,11 +355,18 @@ function expandWeekValuePairs(rows = []) {
 }
 
 function compactCompletedIntervals(intervals = []) {
-  return compactRows(intervals, (interval) =>
-    interval.startWeek === (interval.endWeek ?? interval.startWeek)
+  return compactRows(intervals, (interval) => {
+    const endWeek = interval.endWeek ?? interval.startWeek;
+    const rawAllocatedUnits = interval.rawAllocatedUnits;
+
+    if (rawAllocatedUnits !== null && rawAllocatedUnits !== undefined && rawAllocatedUnits !== interval.allocatedUnits) {
+      return [interval.startWeek, endWeek, interval.allocatedUnits, rawAllocatedUnits];
+    }
+
+    return interval.startWeek === endWeek
       ? [interval.startWeek, interval.allocatedUnits]
-      : [interval.startWeek, interval.endWeek, interval.allocatedUnits],
-  );
+      : [interval.startWeek, endWeek, interval.allocatedUnits];
+  });
 }
 
 function expandCompletedIntervals(rows = []) {
@@ -374,6 +381,7 @@ function expandCompletedIntervals(rows = []) {
           startWeek: row[0],
           endWeek: row[1] ?? row[0],
           allocatedUnits: row[2] ?? 0,
+          ...(row[3] !== null && row[3] !== undefined ? { rawAllocatedUnits: row[3] } : {}),
         },
   );
 }
