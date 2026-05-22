@@ -45,8 +45,8 @@ textarea {
   pointer-events: none;
   text-align: center;
   transition:
-    opacity 100ms ease 100ms,
-    transform 100ms ease 100ms;
+    opacity 100ms ease,
+    transform 100ms ease;
   white-space: nowrap;
 }
 

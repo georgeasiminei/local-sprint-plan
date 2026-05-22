@@ -1,5 +1,5 @@
 import { createId } from '../utils/uuid.js';
-import { shiftTask } from '../engine/shiftTask.js';
+import { shiftTaskRemainder, splitTaskAtWeek } from '../engine/taskTimelineEdits.js';
 import {
   clearTaskCompletion,
   freezeTaskFromSchedule,
@@ -36,6 +36,7 @@ export function createTasksSlice(set, get) {
 
       set({
         selectedTaskId: id,
+        selectedTaskWeekIndex: null,
         selectedCategoryId: null,
         selectedDependencyId: null,
         selectedExternalDependencyId: null,
@@ -98,11 +99,13 @@ export function createTasksSlice(set, get) {
           ),
         schedule: (schedule) => schedule.filter((item) => item.taskId !== taskId),
       }),
-    shiftTask: (taskId, weekDelta) =>
-      get().updateActiveDocument((document) => ({
-        ...document,
-        tasks: shiftTask(document.tasks, taskId, Number(weekDelta) || 0, document.plan.startWeek ?? 1),
-      })),
+    shiftTaskRemainder: (taskId, anchorWeekIndex, weekDelta) =>
+      get().updateActiveDocument((document) => shiftTaskRemainder(document, taskId, anchorWeekIndex, weekDelta)),
+    splitTaskAtWeek: (taskId, anchorWeekIndex) =>
+      get().updateActiveDocument((document) => {
+        const id = createId('task', (document?.tasks ?? []).map((taskItem) => taskItem.id));
+        return splitTaskAtWeek(document, taskId, anchorWeekIndex, id);
+      }),
   };
 }
 

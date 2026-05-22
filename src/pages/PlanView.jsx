@@ -9,6 +9,7 @@ import {
   Plus,
   Redo2,
   Save,
+  Scissors,
   Settings,
   Undo2,
 } from 'lucide-react';
@@ -58,11 +59,14 @@ export default function PlanView() {
   const savedPlanId = useTimelineStore((state) => state.savedPlanId);
   const selectedCategoryId = useTimelineStore((state) => state.selectedCategoryId);
   const selectedTaskId = useTimelineStore((state) => state.selectedTaskId);
+  const selectedTaskWeekIndex = useTimelineStore((state) => state.selectedTaskWeekIndex);
   const showDependencyPanel = useTimelineStore((state) => state.showDependencyPanel);
   const showSettingsPanel = useTimelineStore((state) => state.showSettingsPanel);
   const hydratePlan = useTimelineStore((state) => state.hydratePlan);
+  const requestWeekEdit = useTimelineStore((state) => state.requestWeekEdit);
   const setImportError = useTimelineStore((state) => state.setImportError);
   const setSavedPlan = useTimelineStore((state) => state.setSavedPlan);
+  const splitTaskAtWeek = useTimelineStore((state) => state.splitTaskAtWeek);
   const updateActiveDocument = useTimelineStore((state) => state.updateActiveDocument);
   const undo = useTimelineStore((state) => state.undo);
   const redo = useTimelineStore((state) => state.redo);
@@ -130,6 +134,15 @@ export default function PlanView() {
 
   function saveCurrentPlan() {
     setIsSaveModalOpen(true);
+  }
+
+  function splitSelectedTask() {
+    if (!selectedTaskId || !selectedTaskWeekIndex) {
+      return;
+    }
+
+    const week = document.weeks.find((item) => item.weekIndex === selectedTaskWeekIndex);
+    requestWeekEdit(week, () => splitTaskAtWeek(selectedTaskId, selectedTaskWeekIndex));
   }
 
   function openLoadModal() {
@@ -223,7 +236,10 @@ export default function PlanView() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex h-9 items-center gap-2 rounded border border-line bg-white px-2 text-xs font-medium text-slate-700">
+            <label
+              className="app-tooltip flex h-9 items-center gap-2 rounded border border-line bg-white px-2 text-xs font-medium text-slate-700"
+              data-tooltip="Show day-off and vacation adjusted resources. Uncheck to edit planned allocation."
+            >
               <input
                 type="checkbox"
                 className="size-3.5 rounded border-line text-focus focus:ring-focus/20"
@@ -315,12 +331,23 @@ export default function PlanView() {
               variant="secondary"
               className="text-xs"
               onClick={openShiftTask}
-              disabled={!selectedTaskId}
+              disabled={!selectedTaskId || !selectedTaskWeekIndex}
               aria-label="Shift selected task by weeks"
-              tooltip="Shift selected task by weeks"
+              tooltip="Shift remaining work from the selected cell by whole or fractional weeks"
             >
               <MoveHorizontal size={20} />
               Shift
+            </Button>
+            <Button
+              variant="secondary"
+              className="text-xs"
+              onClick={splitSelectedTask}
+              disabled={!selectedTaskId || !selectedTaskWeekIndex}
+              aria-label="Split selected task at selected week"
+              tooltip="Split the selected task at the selected cell"
+            >
+              <Scissors size={20} />
+              Split
             </Button>
           </div>
         </header>

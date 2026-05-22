@@ -11,6 +11,7 @@ export default function TaskCell({
   isOverride,
   isLocked,
   isEditable = true,
+  isSelected = false,
   cellColor,
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -31,12 +32,14 @@ export default function TaskCell({
       role={week && taskId ? 'button' : undefined}
       tabIndex={week && taskId ? 0 : undefined}
       aria-label={week && taskId ? getCellLabel(taskName, week, isEditable && !isLocked) : undefined}
-      className="overflow-hidden border-b border-r border-slate-200 px-1 text-center text-xs"
+      className={`overflow-hidden border-b border-r border-slate-200 px-1 text-center text-xs ${
+        isSelected ? 'ring-2 ring-inset ring-focus/60' : ''
+      }`}
       style={{ height: rowHeight, lineHeight: `${rowHeight}px`, ...(cellColor ? { backgroundColor: cellColor } : {}) }}
       onClick={(event) => {
         event.stopPropagation();
         if (taskId) {
-          selectTask(taskId);
+          selectTask(taskId, week?.weekIndex ?? null);
         }
         if (week && isEditable && !isLocked) {
           setIsEditing(true);
@@ -46,7 +49,7 @@ export default function TaskCell({
         if ((event.key === 'Enter' || event.key === ' ') && week) {
           event.preventDefault();
           if (taskId) {
-            selectTask(taskId);
+            selectTask(taskId, week?.weekIndex ?? null);
           }
           if (isEditable && !isLocked) {
             setIsEditing(true);
