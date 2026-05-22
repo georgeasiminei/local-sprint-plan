@@ -14,15 +14,36 @@ export default function TaskCell({
   isSelected = false,
   cellColor,
 }) {
-  const [isEditing, setIsEditing] = useState(false);
   const [draftValue, setDraftValue] = useState('');
   const clickTimerRef = useRef(null);
   const lastClickTimeRef = useRef(0);
+  const editorRef = useRef(null);
   const requestWeekEdit = useTimelineStore((state) => state.requestWeekEdit);
   const setTaskResourceFromWeek = useTimelineStore((state) => state.setTaskResourceFromWeek);
   const selectTaskCell = useTimelineStore((state) => state.selectTaskCell);
+  const editingResourceCell = useTimelineStore((state) => state.editingResourceCell);
+  const openResourceCellEditor = useTimelineStore((state) => state.openResourceCellEditor);
+  const closeResourceCellEditor = useTimelineStore((state) => state.closeResourceCellEditor);
+  const isEditing = editingResourceCell?.taskId === taskId && editingResourceCell?.weekIndex === week?.weekIndex;
 
   useEffect(() => () => window.clearTimeout(clickTimerRef.current), []);
+
+  useEffect(() => {
+    if (!isEditing) {
+      return undefined;
+    }
+
+    function handlePointerDown(event) {
+      if (editorRef.current?.contains(event.target)) {
+        return;
+      }
+
+      closeResourceCellEditor();
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [closeResourceCellEditor, isEditing]);
 
   function openEditor() {
     if (!week || !taskId || !isEditable || isLocked) {
@@ -31,7 +52,7 @@ export default function TaskCell({
 
     selectTaskCell(taskId, week.weekIndex);
     setDraftValue(allocation ?? '');
-    setIsEditing(true);
+    openResourceCellEditor(taskId, week.weekIndex);
   }
 
   function selectCell() {
@@ -41,7 +62,7 @@ export default function TaskCell({
   }
 
   function commit(value) {
-    setIsEditing(false);
+    closeResourceCellEditor();
     if (!week || !taskId || !isEditable || isLocked) {
       return;
     }
@@ -49,7 +70,7 @@ export default function TaskCell({
   }
 
   function unset() {
-    setIsEditing(false);
+    closeResourceCellEditor();
     if (!week || !taskId || !isEditable || isLocked) {
       return;
     }
@@ -106,7 +127,9 @@ export default function TaskCell({
     >
       {isEditing ? (
         <div
-          className="absolute left-1 top-1 z-30 flex items-center gap-1 rounded border border-line bg-white p-1 shadow-panel"
+          ref={editorRef}
+          aria-label="Resource allocation editor"
+          className="absolute left-1 top-1 z-30 grid grid-cols-[48px_48px] gap-1 rounded border border-line bg-white p-1 shadow-panel"
           onClick={(event) => event.stopPropagation()}
           onDoubleClick={(event) => event.stopPropagation()}
           style={{ lineHeight: 1 }}
@@ -121,13 +144,25 @@ export default function TaskCell({
             onChange={(event) => setDraftValue(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
+                event.preventDefault();
+                event.stopPropagation();
                 commit(draftValue);
               }
               if (event.key === 'Escape') {
-                setIsEditing(false);
+                event.preventDefault();
+                event.stopPropagation();
+                closeResourceCellEditor();
               }
             }}
           />
+          <button
+            type="button"
+            aria-label="Cancel resource edit"
+            className="grid size-6 justify-self-end place-items-center rounded text-[13px] font-semibold text-slate-500 hover:bg-panel hover:text-ink"
+            onClick={closeResourceCellEditor}
+          >
+            x
+          </button>
           <button
             type="button"
             className="h-6 rounded bg-focus px-2 text-[11px] font-medium text-white hover:bg-blue-700"
@@ -141,14 +176,6 @@ export default function TaskCell({
             onClick={unset}
           >
             Unset
-          </button>
-          <button
-            type="button"
-            aria-label="Cancel resource edit"
-            className="grid size-6 place-items-center rounded text-[13px] font-semibold text-slate-500 hover:bg-panel hover:text-ink"
-            onClick={() => setIsEditing(false)}
-          >
-            x
           </button>
         </div>
       ) : null}

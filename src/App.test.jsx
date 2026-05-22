@@ -777,6 +777,87 @@ describe('URL-owned app state', () => {
     await waitFor(() => {
       expect(useTimelineStore.getState().getActiveDocument().tasks[0].resourceOverrides).toEqual([]);
     });
+
+    await user.dblClick(cell);
+    const enterInput = within(cell).getByLabelText(`Resource value for Explicit edit task in ${firstWeek.label}`);
+    await user.clear(enterInput);
+    await user.type(enterInput, '3{Enter}');
+
+    await waitFor(() => {
+      expect(useTimelineStore.getState().getActiveDocument().tasks[0].resourceOverrides).toEqual([
+        { weekIndex: firstWeek.weekIndex, allocatedUnits: 3 },
+      ]);
+    });
+    expect(within(cell).queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('cancels the explicit resource editor when clicking elsewhere', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    act(() => {
+      const store = useTimelineStore.getState();
+      const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+      store.updatePlanSettings({ startYear: weekYear, startWeek: weekNumber, startingResourceCount: 5 });
+      store.addTask({
+        name: 'Cancel edit task',
+        estimateWeeks: 10,
+      });
+    });
+
+    const firstWeek = useTimelineStore.getState().getActiveDocument().weeks[0];
+    const cell = await screen.findByRole('button', {
+      name: `Set Cancel edit task resources in ${firstWeek.label}`,
+    });
+
+    await user.dblClick(cell);
+    const input = within(cell).getByLabelText(`Resource value for Cancel edit task in ${firstWeek.label}`);
+    await user.clear(input);
+    await user.type(input, '4');
+
+    fireEvent.pointerDown(document.body);
+
+    await waitFor(() => {
+      expect(within(cell).queryByRole('textbox')).not.toBeInTheDocument();
+    });
+    expect(useTimelineStore.getState().editingResourceCell).toBeNull();
+    expect(useTimelineStore.getState().getActiveDocument().tasks[0].resourceOverrides).toEqual([]);
+  });
+
+  it('keeps only one explicit resource editor open at a time', async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    act(() => {
+      const store = useTimelineStore.getState();
+      const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+      store.updatePlanSettings({ startYear: weekYear, startWeek: weekNumber, startingResourceCount: 5 });
+      store.addTask({
+        name: 'One editor task',
+        estimateWeeks: 10,
+      });
+    });
+
+    const weeks = useTimelineStore.getState().getActiveDocument().weeks;
+    const firstCell = await screen.findByRole('button', {
+      name: `Set One editor task resources in ${weeks[0].label}`,
+    });
+    const secondCell = await screen.findByRole('button', {
+      name: `Set One editor task resources in ${weeks[1].label}`,
+    });
+
+    await user.dblClick(firstCell);
+    expect(within(firstCell).getByLabelText(`Resource value for One editor task in ${weeks[0].label}`)).toBeInTheDocument();
+
+    await user.dblClick(secondCell);
+
+    expect(within(firstCell).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(secondCell).getByLabelText(`Resource value for One editor task in ${weeks[1].label}`)).toBeInTheDocument();
+    expect(screen.getAllByRole('textbox', { name: /Resource value for One editor task/ })).toHaveLength(1);
   });
 
   it('edits working days and plan vacation person-days from the week panel', async () => {
@@ -1085,6 +1166,7 @@ function resetStore() {
     activePanel: 'task',
     selectedExternalDependencyId: null,
     selectedWeekIndex: null,
+    editingResourceCell: null,
     pendingPastWeekEdit: null,
     undoStack: [],
     redoStack: [],
