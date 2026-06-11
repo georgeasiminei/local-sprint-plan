@@ -27,7 +27,7 @@ npm run test:watch
 
 The URL hash is the active saved state. Manual `Save` and `Load` actions keep named local snapshots in `localStorage` when the user explicitly asks for them. `Backup/restore` downloads or restores the full local snapshot library in one JSON file.
 
-The hash stores a compact source-only document and the app regenerates ISO weeks, sprints, and computed schedule rows in memory.
+The hash stores a compact source-only document and the app regenerates planning weeks, sprints, and computed schedule rows in memory.
 
 Task cell edits are saved as compact resource rules: setting a task to `x` resources in a week applies `x` from that week onward until another rule is added.
 Completed historical tasks store only compact frozen resource intervals, so old schedule history stays stable without bloating the URL.
@@ -40,14 +40,17 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 
 ## Planning Details
 
-- Weeks are ISO week-year columns labeled `YY.WW`.
+- Weeks are ISO-style planning week-year columns labeled `YY.WW`.
+- The planning calendar always uses 52 numbered weeks per year: after `26.52`, the next week is `27.01`, never `26.53`.
+- Hovering a week shows the internally generated Monday-Friday date range and quarter, for example `Jun 15 - 19 · Q2` or `Jun 29 - Jul 3 · Q2/Q3`. No external calendar service or runtime request is used.
+- Plan settings include `View starting week` to hide old columns without changing scheduling. Use a label such as `26.21`, or a number such as `5` to show the current week plus five earlier weeks. If the cutoff would split a sprint, it snaps back to the sprint start.
 - Category and task columns stay frozen while the week columns scroll horizontally.
 - The current plan name is shown in the top-left header and is included in copied/exported JSON state.
 - On wide screens, the planner uses the full browser width before the week grid needs horizontal scrolling.
 - Categories render as merged cells spanning their task rows to keep the table vertically compact.
 - Task/category colors appear only on weeks where the task has allocated resources.
 - Today is shown as a thin blue line positioned within the current week, while external dependency deadline lines keep their status colors on week borders.
-- External dependencies are thin full-height deadline lines; their editable text boxes sit in a dependency lane below the table, and due weeks use ISO labels such as `26.12`.
+- External dependencies are thin full-height deadline lines; their editable text boxes sit in a dependency lane below the table, and due weeks use planning labels such as `26.12`.
 - External dependency colors are status and date aware: incomplete past-due markers are red, incomplete future markers are dark grey, partial markers are yellow, and completed markers are green.
 - Rows and week columns use fixed configurable pixel sizes with clipped text so the grid stays compact and spreadsheet-like.
 - The total effort row shows assigned/capacity per week. Click a week header or total-effort cell to edit week resources, working days, and vacation days in the week panel.

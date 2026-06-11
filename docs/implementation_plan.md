@@ -9,17 +9,20 @@ Build and maintain a live local-only React planning app whose single active plan
 - The app opens directly to one timeline editor and stores the plan in `location.hash`.
 - Zustand keeps one runtime document for rendering, undo/redo, and scheduling.
 - `src/persistence/shareUrl.js` stores compact source data only; generated weeks, sprints, computed schedule rows, timestamps, and long IDs are excluded.
-- Weeks are generated from ISO week-year settings and labeled as `YY.WW`.
+- Weeks are generated from ISO-style planning week-year settings and labeled as `YY.WW`. The planning calendar always uses 52 numbered weeks per year, so `xx.52` rolls to `<xx+1>.01` and week 53 is never emitted.
 - Sprints are generated in fixed 2-week groups, with editable numbering from a chosen sprint onward.
 - Timeline cells use fixed configurable row height / week width with clipped text and thin spreadsheet-style task row borders.
-- External dependencies are deadline markers with notes and status, rendered as thin full-height timeline lines with editable note boxes in a lane below the table. Deadline weeks are edited as ISO labels such as `26.12`. Incomplete past-due markers are red, incomplete future markers are dark grey, partial markers are yellow, and completed markers are green.
+- Week header and total-effort tooltips are generated locally from each week `startDate`. They show the Monday-Friday date range and quarter, including split-quarter labels such as `Q2/Q3`, with no external calendar requests or runtime data transmission.
+- `View starting week` is a render-only old-column cutoff. It accepts an absolute planning week label such as `26.21` or a relative number such as `5`, meaning current week plus five earlier weeks. The cutoff is snapped backward to the containing sprint start so visible sprint headers remain whole.
+- External dependencies are deadline markers with notes and status, rendered as thin full-height timeline lines with editable note boxes in a lane below the table. Deadline weeks are edited as planning labels such as `26.12`. Incomplete past-due markers are red, incomplete future markers are dark grey, partial markers are yellow, and completed markers are green.
 
 ## Key Behaviors
 
 - Empty URL creates a default URL-owned plan without adding a hash until the first meaningful edit; hash URLs load directly without an import prompt.
 - The active plan name is visible in the top-left header and is part of the compact JSON/URL source state.
 - Plan edits debounce `history.replaceState` updates.
-- Week and task-completion boundaries use local calendar dates, matching the date-only ISO-week UI rather than treating those labels as UTC instants.
+- Week and task-completion boundaries use local calendar dates, matching the date-only planning-week UI rather than treating those labels as UTC instants.
+- View-window filtering is applied only to timeline rendering. It must not mutate generated weeks, scheduling inputs, task resource rules, external dependency due weeks, manual allocations, or exported schedule data.
 - `Save` and `Load` manage named manual snapshots in `localStorage`; saving always prompts for a name, updates the current saved snapshot when the name is unchanged, creates a new snapshot when the name changes, and applies the submitted name to the active plan. Loading a named snapshot applies that saved name to the active plan.
 - Task resource edits are source rules that apply from the edited week onward.
 - Task cells are selection-only on single click. Double-click opens one compact 2-by-2 Set/Unset/cancel editor so blur, clicking elsewhere, or accidental selection cannot create a resource override.
@@ -52,6 +55,6 @@ Build and maintain a live local-only React planning app whose single active plan
 
 ## Verification
 
-- Unit tests cover ISO week generation, compact URL round trips, scheduling, validation, and payload errors.
+- Unit tests cover planning week generation, compact URL round trips, scheduling, validation, and payload errors.
 - Component tests cover hash loading/updating, clean root URLs, local snapshot save/load, focused panel behavior, category task defaults, external dependency persistence, cascading capacity, week-panel resource/vacation edits, and past-week confirmation.
 - Run `npm run test` and `npm run build` before considering changes complete.

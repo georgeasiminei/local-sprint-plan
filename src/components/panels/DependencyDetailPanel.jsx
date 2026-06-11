@@ -73,7 +73,7 @@ export default function DependencyDetailPanel({ document }) {
     const text = externalText.trim();
     const dueWeek = parseDueWeekLabel(document, externalDueWeekLabel);
     if (!dueWeek) {
-      setError('Use an ISO week such as 26.12.');
+      setError('Use a planning week such as 26.12.');
       return;
     }
 

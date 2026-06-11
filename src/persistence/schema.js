@@ -31,6 +31,7 @@ export function createPlanDocument({
   rowHeight = DEFAULT_ROW_HEIGHT,
   weekColumnWidth = DEFAULT_WEEK_COLUMN_WIDTH,
   showInternalDependencyLines = true,
+  viewStartWeek = '',
   now = new Date().toISOString(),
 } = {}) {
   const plan = {
@@ -45,6 +46,7 @@ export function createPlanDocument({
     rowHeight,
     weekColumnWidth,
     showInternalDependencyLines,
+    viewStartWeek,
     vacations: [],
     createdAt: now,
     updatedAt: now,

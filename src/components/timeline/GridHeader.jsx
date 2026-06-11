@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTimelineStore } from '../../store/index.js';
 import { CATEGORY_COLUMN_WIDTH, TASK_COLUMN_WIDTH, weekGridColumns } from './layout.js';
+import { formatWeekTooltip } from './weekTooltip.js';
 
 export default function GridHeader({ weeks = [], sprints = [], weekColumnWidth }) {
   const [editingSprintId, setEditingSprintId] = useState(null);
@@ -73,19 +74,23 @@ export default function GridHeader({ weeks = [], sprints = [], weekColumnWidth }
         ) : null}
         <div className="grid border-b border-line" style={{ gridTemplateColumns: weekGridColumns(weeks.length, weekColumnWidth) }}>
           {weeks.length > 0 ? (
-            weeks.map((week) => (
-              <button
-                key={week.id}
-                type="button"
-                className={`app-tooltip border-r border-line px-1.5 py-1 text-center text-[11px] font-medium hover:bg-white ${
-                      selectedWeekIndex === week.weekIndex ? 'bg-white font-bold text-ink ring-1 ring-inset ring-focus/40' : 'text-slate-600'
-                    }`}
-                data-tooltip={`Open ${week.label}`}
-                onClick={() => selectWeek(week.weekIndex)}
-              >
-                {week.label}
-              </button>
-            ))
+            weeks.map((week) => {
+              const tooltip = formatWeekTooltip(week);
+              return (
+                <button
+                  key={week.id}
+                  type="button"
+                  className={`app-tooltip border-r border-line px-1.5 py-1 text-center text-[11px] font-medium hover:bg-white ${
+                        selectedWeekIndex === week.weekIndex ? 'bg-white font-bold text-ink ring-1 ring-inset ring-focus/40' : 'text-slate-600'
+                      }`}
+                  data-tooltip={tooltip}
+                  title={tooltip}
+                  onClick={() => selectWeek(week.weekIndex)}
+                >
+                  {week.label}
+                </button>
+              );
+            })
           ) : (
             <div className="px-3 py-2 text-xs text-slate-500">Add weeks to start planning</div>
           )}

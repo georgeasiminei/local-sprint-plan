@@ -55,6 +55,19 @@ export default function PlanSettingsPanel({ document }) {
               />
             </label>
           </div>
+          <label className="block text-sm font-medium">
+            View starting week
+            <DeferredTextSettingInput
+              className="mt-1 w-full"
+              value={document.plan.viewStartWeek ?? ''}
+              placeholder="26.21 or 5"
+              aria-label="View starting week"
+              onCommit={(viewStartWeek) => updatePlanSettings({ viewStartWeek })}
+            />
+            <span className="mt-1 block text-xs font-normal text-slate-500">
+              Use a planning week like 26.21, or a number of weeks to keep before the current week.
+            </span>
+          </label>
           <div className="flex flex-wrap gap-2">
             <Badge>{document.weeks.length} calculated weeks</Badge>
             <Badge>{document.sprints.length} sprints</Badge>
@@ -74,6 +87,40 @@ export default function PlanSettingsPanel({ document }) {
         </p>
       </div>
     </Sidebar>
+  );
+}
+
+function DeferredTextSettingInput({ value, onCommit, ...props }) {
+  const [draft, setDraft] = useState(String(value ?? ''));
+
+  useEffect(() => {
+    setDraft(String(value ?? ''));
+  }, [value]);
+
+  function commit() {
+    const nextValue = draft.trim();
+    if (nextValue !== String(value ?? '')) {
+      onCommit(nextValue);
+    }
+  }
+
+  return (
+    <Input
+      {...props}
+      type="text"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
+        }
+        if (event.key === 'Escape') {
+          setDraft(String(value ?? ''));
+          event.currentTarget.blur();
+        }
+      }}
+    />
   );
 }
 

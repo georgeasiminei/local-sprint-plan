@@ -1195,7 +1195,7 @@ describe('URL-owned app state', () => {
     expect(useTimelineStore.getState().getActiveDocument().tasks).toHaveLength(0);
   });
 
-  it('shows the today marker for the current ISO week', async () => {
+  it('shows the today marker for the current planning week', async () => {
     const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
     const payload = await encodePlanToHashPayload(
       createPlanFixture({

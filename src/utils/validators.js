@@ -67,6 +67,10 @@ export function validatePlanDocument(document) {
     errors.push('Plan showInternalDependencyLines must be a boolean.');
   }
 
+  if (document.plan?.viewStartWeek !== undefined && typeof document.plan.viewStartWeek !== 'string') {
+    errors.push('Plan viewStartWeek must be a string.');
+  }
+
   for (const key of ROOT_ARRAY_KEYS) {
     if (!Array.isArray(document[key])) {
       errors.push(`${key} must be an array.`);

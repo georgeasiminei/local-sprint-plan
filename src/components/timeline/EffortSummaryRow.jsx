@@ -2,6 +2,7 @@ import { getResourceAllocationForEntry } from '../../engine/allocationDisplay.js
 import { useTimelineStore } from '../../store/index.js';
 import { formatNumber } from '../../utils/format.js';
 import { CATEGORY_COLUMN_WIDTH, TASK_COLUMN_WIDTH, weekGridColumns } from './layout.js';
+import { formatWeekTooltip } from './weekTooltip.js';
 
 export default function EffortSummaryRow({ document, rowHeight, weekColumnWidth }) {
   const selectWeek = useTimelineStore((state) => state.selectWeek);
@@ -38,6 +39,7 @@ export default function EffortSummaryRow({ document, rowHeight, weekColumnWidth 
         {document.weeks.map((week) => {
           const effectiveAssigned = effectiveAllocationByWeek.get(week.weekIndex) ?? 0;
           const resourceAssigned = resourceAllocationByWeek.get(week.weekIndex) ?? 0;
+          const tooltip = formatWeekTooltip(week);
 
           return (
             <div
@@ -47,7 +49,8 @@ export default function EffortSummaryRow({ document, rowHeight, weekColumnWidth 
               className="app-tooltip overflow-hidden border-b border-r border-slate-200 px-1 text-center text-[11px] font-medium text-slate-700 hover:bg-white"
               style={{ height: rowHeight, lineHeight: `${rowHeight}px` }}
               aria-label={`Open week ${week.label}`}
-              data-tooltip={`Open ${week.label}`}
+              data-tooltip={tooltip}
+              title={tooltip}
               onClick={(event) => {
                 event.stopPropagation();
                 selectWeek(week.weekIndex);

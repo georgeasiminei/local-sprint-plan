@@ -2,16 +2,18 @@ import { DEFAULT_SPRINT_LENGTH_WEEKS, DEFAULT_START_WEEK, DEFAULT_START_YEAR, MI
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
+const PLANNING_WEEKS_PER_YEAR = 52;
 
 export function buildCalculatedWeeks(startWeek = DEFAULT_START_WEEK, weekCount = MIN_VISIBLE_WEEKS, startYear = DEFAULT_START_YEAR) {
   const firstWeek = Number(startWeek) || DEFAULT_START_WEEK;
   const firstYear = Number(startYear) || DEFAULT_START_YEAR;
   const count = Math.max(MIN_VISIBLE_WEEKS, Math.ceil(Number(weekCount) || 0));
+  const firstStartDate = getPlanningWeekStartDate(firstYear, firstWeek);
 
   return Array.from({ length: count }, (_, index) => {
     const weekIndex = firstWeek + index;
-    const { weekYear, weekNumber } = normalizeIsoWeek(firstYear, firstWeek + index);
-    const startDate = getIsoWeekStartDate(weekYear, weekNumber);
+    const { weekYear, weekNumber } = normalizePlanningWeek(firstYear, firstWeek + index);
+    const startDate = addDays(firstStartDate, index * 7);
     const endDate = addDays(startDate, 6);
 
     return {
@@ -58,9 +60,14 @@ export function buildFixedSprints(weeks = [], sprintStartNumber = 1, sprintStart
 export function getCurrentIsoWeekInfo(date = new Date()) {
   const weekStart = startOfIsoWeek(date);
   const thursday = addDays(weekStart, 3);
-  const weekYear = thursday.getFullYear();
+  let weekYear = thursday.getFullYear();
   const firstWeekStart = getIsoWeekStartDate(weekYear, 1);
-  const weekNumber = Math.round((weekStart.getTime() - firstWeekStart.getTime()) / WEEK_MS) + 1;
+  let weekNumber = Math.round((weekStart.getTime() - firstWeekStart.getTime()) / WEEK_MS) + 1;
+
+  if (weekNumber > PLANNING_WEEKS_PER_YEAR) {
+    weekYear += 1;
+    weekNumber = 1;
+  }
 
   return { weekYear, weekNumber };
 }
@@ -74,25 +81,26 @@ export function isPastWeek(week, today = new Date()) {
   return end < today;
 }
 
-function normalizeIsoWeek(year, weekNumber) {
+function normalizePlanningWeek(year, weekNumber) {
   let normalizedYear = Number(year) || DEFAULT_START_YEAR;
   let normalizedWeek = Number(weekNumber) || DEFAULT_START_WEEK;
 
   while (normalizedWeek < 1) {
     normalizedYear -= 1;
-    normalizedWeek += getIsoWeeksInYear(normalizedYear);
+    normalizedWeek += PLANNING_WEEKS_PER_YEAR;
   }
 
-  while (normalizedWeek > getIsoWeeksInYear(normalizedYear)) {
-    normalizedWeek -= getIsoWeeksInYear(normalizedYear);
+  while (normalizedWeek > PLANNING_WEEKS_PER_YEAR) {
+    normalizedWeek -= PLANNING_WEEKS_PER_YEAR;
     normalizedYear += 1;
   }
 
   return { weekYear: normalizedYear, weekNumber: normalizedWeek };
 }
 
-function getIsoWeeksInYear(year) {
-  return getCurrentIsoWeekInfo(new Date(year, 11, 28)).weekNumber;
+function getPlanningWeekStartDate(year, weekNumber) {
+  const firstWeekStart = getIsoWeekStartDate(year, 1);
+  return addDays(firstWeekStart, (weekNumber - 1) * 7);
 }
 
 function getIsoWeekStartDate(year, weekNumber) {
