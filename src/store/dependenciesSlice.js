@@ -12,6 +12,7 @@ export function createDependenciesSlice(set, get) {
         if (
           !predecessorId ||
           !successorId ||
+          successorType === 'external' ||
           (predecessorType === successorType && predecessorId === successorId)
         ) {
           return document;
@@ -77,6 +78,10 @@ export function createDependenciesSlice(set, get) {
           ...patch,
           lagWeeks: patch.lagWeeks === undefined ? dependency.lagWeeks : Math.max(0, Number(patch.lagWeeks) || 0),
         };
+
+        if (candidate.successorType === 'external') {
+          return document;
+        }
 
         if (wouldCreateDependencyCycle(document, candidate, dependencyId)) {
           return document;
@@ -161,6 +166,9 @@ export function createDependenciesSlice(set, get) {
       get().updateActiveDocument((document) => ({
         ...document,
         externalDependencies: (document.externalDependencies ?? []).filter((item) => item.id !== dependencyId),
+        dependencies: (document.dependencies ?? []).filter(
+          (item) => !((item.predecessorType ?? 'task') === 'external' && item.predecessorId === dependencyId),
+        ),
       })),
   };
 }

@@ -1,5 +1,6 @@
 import { LEFT_COLUMN_WIDTH } from './layout.js';
 import { getDependencyEndpoint, getDependencyEntityName, getEntityTasks } from '../../utils/dependencies.js';
+import { isPastWeek } from '../../engine/timeline.js';
 
 export default function OverlayLines({ document, weekColumnWidth }) {
   const weeks = document.weeks ?? [];
@@ -41,7 +42,7 @@ export default function OverlayLines({ document, weekColumnWidth }) {
           color={marker.lineClass}
           label=""
           solid
-          widthClass="w-1"
+          widthClass="w-0.5"
         />
       ))}
     </div>
@@ -158,40 +159,55 @@ function createExternalDependencyMarkers(document) {
         return null;
       }
 
-      const mostUrgentStatus = getMostUrgentStatus(dependencies.map((dependency) => dependency.status));
+      const week = document.weeks[weekIndex];
+      const mostUrgentTone = getMostUrgentExternalDependencyTone(dependencies, week);
       return {
         key: `external-${dueWeek}`,
         index: weekIndex + 1,
-        lineClass: getExternalDependencyStyle(mostUrgentStatus).lineClass,
+        lineClass: getExternalDependencyStyle(mostUrgentTone).lineClass,
       };
     })
     .filter(Boolean);
 }
 
-function getMostUrgentStatus(statuses) {
-  if (statuses.some((status) => status === 'no' || !status)) {
-    return 'no';
+function getMostUrgentExternalDependencyTone(dependencies, week) {
+  const priority = { overdue: 0, partial: 1, pending: 2, complete: 3 };
+  return dependencies
+    .map((dependency) => getExternalDependencyTone(dependency, week))
+    .sort((left, right) => priority[left] - priority[right])[0] ?? 'pending';
+}
+
+function getExternalDependencyTone(dependency, week) {
+  if (dependency.status === 'yes') {
+    return 'complete';
   }
 
-  if (statuses.some((status) => status === 'partial')) {
+  if (dependency.status === 'partial') {
     return 'partial';
   }
 
-  return 'yes';
+  return isPastWeek(week) ? 'overdue' : 'pending';
 }
 
-function getExternalDependencyStyle(status) {
-  if (status === 'yes') {
+function getExternalDependencyStyle(tone) {
+  if (tone === 'complete') {
     return {
       lineClass: 'bg-emerald-500',
       boxClass: 'border-emerald-300 bg-emerald-50 text-emerald-950',
     };
   }
 
-  if (status === 'partial') {
+  if (tone === 'partial') {
     return {
-      lineClass: 'bg-slate-300',
-      boxClass: 'border-slate-300 bg-white text-slate-700',
+      lineClass: 'bg-yellow-400',
+      boxClass: 'border-yellow-300 bg-yellow-100 text-yellow-950',
+    };
+  }
+
+  if (tone === 'pending') {
+    return {
+      lineClass: 'bg-slate-700',
+      boxClass: 'border-slate-400 bg-slate-100 text-slate-800',
     };
   }
 

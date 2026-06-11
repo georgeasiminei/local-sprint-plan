@@ -47,6 +47,9 @@ export function compactPlanDocument(document) {
   const sprintStartOrder = document.plan?.sprintStartOrder ?? 1;
   const categoryIndex = new Map((document.categories ?? []).map((category, index) => [category.id, index]));
   const taskIndex = new Map((document.tasks ?? []).map((task, index) => [task.id, index]));
+  const externalDependencyIndex = new Map(
+    (document.externalDependencies ?? []).map((dependency, index) => [dependency.id, index]),
+  );
   const teamIndex = new Map((document.teams ?? []).map((team, index) => [team.id, index]));
   const firstResourceByTeam = new Map(
     (document.weekResources ?? [])
@@ -88,8 +91,20 @@ export function compactPlanDocument(document) {
     ),
     compactRows(document.dependencies, (dependency) =>
       trimArray([
-        encodeDependencyReference(dependency.predecessorType ?? 'task', dependency.predecessorId, taskIndex, categoryIndex),
-        encodeDependencyReference(dependency.successorType ?? 'task', dependency.successorId, taskIndex, categoryIndex),
+        encodeDependencyReference(
+          dependency.predecessorType ?? 'task',
+          dependency.predecessorId,
+          taskIndex,
+          categoryIndex,
+          externalDependencyIndex,
+        ),
+        encodeDependencyReference(
+          dependency.successorType ?? 'task',
+          dependency.successorId,
+          taskIndex,
+          categoryIndex,
+          externalDependencyIndex,
+        ),
         dependency.lagWeeks || null,
       ]),
     ),
@@ -332,10 +347,15 @@ function decodeColor(value) {
   return value ?? null;
 }
 
-function encodeDependencyReference(type, id, taskIndex, categoryIndex) {
+function encodeDependencyReference(type, id, taskIndex, categoryIndex, externalDependencyIndex) {
   if (type === 'category') {
     const index = categoryIndex.get(id);
     return index === undefined ? null : -(index + 1);
+  }
+
+  if (type === 'external') {
+    const index = externalDependencyIndex.get(id);
+    return index === undefined ? null : `x${index}`;
   }
 
   return taskIndex.get(id);
@@ -344,6 +364,10 @@ function encodeDependencyReference(type, id, taskIndex, categoryIndex) {
 function decodeDependencyReference(value) {
   if (typeof value === 'number' && value < 0) {
     return { type: 'category', id: `c${Math.abs(value)}` };
+  }
+
+  if (typeof value === 'string' && /^x\d+$/u.test(value)) {
+    return { type: 'external', id: `x${Number(value.slice(1)) + 1}` };
   }
 
   return { type: 'task', id: `t${(value ?? 0) + 1}` };

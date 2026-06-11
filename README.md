@@ -1,8 +1,10 @@
 # Local Sprint Plan
 
-A local-only project timeline planner built with React, Vite, Tailwind CSS, and Zustand.
+A live local-only project timeline planner built with React, Vite, Tailwind CSS, and Zustand.
 
 The app is designed to run entirely in the browser. It has no backend, no accounts, no database, and no telemetry. The active plan is stored entirely in the URL hash, so copying the browser URL copies the plan.
+
+Because the project is live, compatibility matters: existing shared URLs and established workflows should keep working unless a breaking change is explicitly chosen and documented with a migration plan.
 
 ## Setup
 
@@ -45,7 +47,8 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 - Categories render as merged cells spanning their task rows to keep the table vertically compact.
 - Task/category colors appear only on weeks where the task has allocated resources.
 - Today is shown as a thin blue line positioned within the current week, while external dependency deadline lines keep their status colors on week borders.
-- External dependencies are full-height deadline lines; their editable text boxes sit in a dependency lane below the table, and due weeks use ISO labels such as `26.12`.
+- External dependencies are thin full-height deadline lines; their editable text boxes sit in a dependency lane below the table, and due weeks use ISO labels such as `26.12`.
+- External dependency colors are status and date aware: incomplete past-due markers are red, incomplete future markers are dark grey, partial markers are yellow, and completed markers are green.
 - Rows and week columns use fixed configurable pixel sizes with clipped text so the grid stays compact and spreadsheet-like.
 - The total effort row shows assigned/capacity per week. Click a week header or total-effort cell to edit week resources, working days, and vacation days in the week panel.
 - Week resource edits apply to that week and following weeks by default; the week panel can limit the change to only the selected week.
@@ -57,7 +60,7 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 - Editing a past week asks for confirmation before changing historical plan data.
 - Tasks in the past, or already in their final execution week, can be marked completed. Very old tasks are completed automatically on load, and their frozen history is removed again if the timeline is moved back into the future. Completed tasks show a subtle italic label plus a check icon in the grid.
 - Selecting a category before adding a task makes the task inherit that category and color.
-- `Task`, `Category`, and `Dependency` open small focused side panels. New task/category names are preselected so typing replaces the starter text immediately. Dependency creation supports external deadlines and internal task-to-task dependencies.
+- `Task`, `Category`, and `Dependency` open small focused side panels. New task/category names are preselected so typing replaces the starter text immediately. Dependency creation supports external deadlines and internal dependencies from tasks, categories, or external dependency predecessors to task/category successors.
 - Numeric fields use plain edit boxes rather than browser increment controls.
 - Pressing Delete with a task, category, or dependency selected deletes it; historical changes ask for confirmation first.
 - Shift bulk-moves checked tasks by a chosen number of weeks by changing their earliest-start constraint. Positive values delay selected tasks; negative values pull them earlier.
@@ -66,7 +69,8 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 
 - Keep scheduling logic pure and separate from React components.
 - Keep generated build output out of version control.
-- Add schema migrations whenever a breaking document shape change is introduced.
+- Keep Markdown docs current in the same change set as behavior changes.
+- Add schema migrations whenever a breaking document shape change is explicitly approved.
 
 ## License
 

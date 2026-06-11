@@ -3,7 +3,9 @@
 
 ## 1. Overview
 
-A web-based project timeline management tool that runs entirely in the browser. No server, no database, no accounts. A single plan lives entirely in the URL hash so it can be shared by copying the current browser URL.
+A live web-based project timeline management tool that runs entirely in the browser. No server, no database, no accounts. A single plan lives entirely in the URL hash so it can be shared by copying the current browser URL.
+
+Because this project is live, compatibility is a product requirement. Avoid breaking existing shared URLs, compact URL payloads, or established user workflows unless the owner explicitly decides on the breaking change and a migration plan is documented.
 
 **Target audience:** Small teams (< 20 users), low-to-medium usage, self-explanatory UI.  
 **Deployment:** A single static HTML/JS/CSS bundle — open in latest Chrome or latest Microsoft Edge Chromium, no install required.
@@ -121,15 +123,15 @@ Completed tasks are historical freezes. Once a task is completed, the app persis
 ```json
 {
   "id": "d1",
-  "predecessorType": "task | category",
-  "predecessorId": "task or category id",
+  "predecessorType": "task | category | external",
+  "predecessorId": "task, category, or external dependency id",
   "successorType": "task | category",
   "successorId": "task or category id",
   "lagWeeks": 0    // optional buffer (in weeks) after predecessor ends before successor can start
 }
 ```
 
-Category endpoints expand into task-level scheduling rules at runtime. A task waiting on a category waits for every task in that category; a category waiting on a task applies that wait to every task in the category; category-to-category dependencies apply both rules together.
+Category endpoints expand into task-level scheduling rules at runtime. A task waiting on a category waits for every task in that category; a category waiting on a task applies that wait to every task in the category; category-to-category dependencies apply both rules together. External dependency endpoints are predecessor-only scheduling gates: a task or category can wait for an external dependency's due week, but an external dependency cannot wait on a task or category.
 
 ### 3.6 External Dependencies
 ```json
@@ -141,7 +143,7 @@ Category endpoints expand into task-level scheduling rules at runtime. A task wa
   "notes": ""
 }
 ```
-External dependencies are not task-to-task constraints. They are deadline markers for expected outside inputs, approvals, environments, or vendor deliverables. Status cycles through `no` (default, red), `partial` (empty/neutral), and `yes` (green).
+External dependencies are deadline markers for expected outside inputs, approvals, environments, or vendor deliverables. They can also be used as predecessor-only internal dependency endpoints, where the due week acts as the predecessor handoff week. Status cycles through `no` (default), `partial`, and `yes`. A `no` marker is red when overdue and dark grey when still in the future; `partial` is always yellow; `yes` is always green.
 
 ### 3.7 Sprints
 ```json
@@ -221,7 +223,7 @@ Resource counts accept one decimal place.
 1. Tasks are sorted by `priority` (ascending — lower number = higher priority).
 2. A task starts in the **first week** where:
    - Resources are available (remaining capacity > 0), AND
-   - All predecessor tasks are fully completed, AND
+   - All predecessor tasks are fully completed and all predecessor external dependencies have passed their due week, AND
    - `weekIndex >= earliestStartWeek` (if set)
 3. **Resource inheritance:** Missing `weekResources` entry → inherit from previous week.
 4. **Working days reduce working capacity:** `workingDayAdjustedCapacity = resourceCount × workingDays / 5`. A four-day week makes each resource count as `0.8` toward task estimates. This productivity factor applies to every activity in that week, including capped tasks and task resource rules; it is not applied only to whichever lower-priority task happens to receive the remaining capacity.
@@ -277,7 +279,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - **Dependency markers:** Vertical lines drawn on the timeline grid at the week boundary where a dependency handoff occurs (i.e., the week column where the successor task is allowed to start). The line spans the full vertical height of the grid (all task rows). Each dependency line is color-coded or labeled and shows the compact relation `Predecessor → Successor` with lag when present. Multiple dependencies at the same week column are stacked/merged into one line with a combined tooltip. Dependency lines are rendered as an SVG overlay on top of the grid, not inside individual cells, and can be shown or hidden from plan settings.
 - **Week panel access:** Clicking a week header or a total-effort cell opens the focused week panel for that ISO week.
 - **Total effort row:** Displayed below task rows. Each week shows `x/y`, where `x` is calculated effective effort for that week and `y` is raw resource allocation for that week.
-- **External dependency markers:** Expected external inputs are rendered as full-height deadline lines on the border after the due week. These lines use red/neutral/green status colors and are visually distinct from the thin blue today line. Free-text boxes are displayed in a dedicated dependency lane below the task table so they do not cover schedule cells. Where space allows, same-week dependency boxes are centered on the deadline line and stack vertically; near edges they may fall to the available side / shrink as needed instead of escaping the scrollable timeline. Compact boxes may truncate long text, with the full note shown on hover.
+- **External dependency markers:** Expected external inputs are rendered as thin full-height deadline lines on the border after the due week. These lines use red for overdue incomplete markers, dark grey for future incomplete markers, yellow for partially complete markers, and green for complete markers. Free-text boxes are displayed in a dedicated dependency lane below the task table so they do not cover schedule cells. Where space allows, same-week dependency boxes are centered on the deadline line and stack vertically; near edges they may fall to the available side / shrink as needed instead of escaping the scrollable timeline. Compact boxes may truncate long text, with the full note shown on hover.
 - **Category totals:** The merged category cell shows compact category summary values; task-week resource totals remain visible in task cells and the total effort row.
 - **Compact toolbar:** The timeline has one compact top toolbar with `Task`, `Category`, `Dependency`, shift, split, CSV export, `Save`, `Load`, `Backup/restore`, and settings actions. Save/load tooltips clarify that they use local storage, Shift explains that it moves remaining work from the selected cell, Effective resources explains the adjusted/read-only view, and the header links back to the original GitHub repository.
 - **Task split:** Select a task-week cell → Split creates a second task starting at that cell. The selected cell becomes the first week of the new task. The new task keeps the original task's category, priority placement, color, max resources, notes, and other task settings, while the original task keeps the work before the split.
@@ -313,10 +315,10 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 ### 5.5 Dependency Manager
 - Adding a dependency first asks whether it is an external deadline marker or an internal task-to-task dependency.
 - Table of all dependencies: Predecessor → Successor, Lag
-- Add new dependency using clearly separated task/category selectors for both predecessor and successor endpoints
+- Add new dependency using clearly separated selectors. Predecessors can be tasks, categories, or external dependencies; successors can be tasks or categories.
 - Remove existing dependency
 - Add, edit, move, and remove external dependency deadline markers by ISO due week label such as `26.12`.
-- External dependency status cycles through No, Partially, and Yes via a checkbox-style control.
+- External dependency status cycles through No, Partially, and Yes via a checkbox-style control. No is red when past due and dark grey when future due; Partially is yellow; Yes is green.
 - Circular dependency detection: warn and block if a cycle would be created
 - Task and category rows expose a compact internal-dependency indicator; clicking it opens the right panel list for that item so internal dependencies can be reviewed and edited after creation
 
@@ -352,7 +354,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - Everything after the first `#` is treated as the payload; no key prefix such as `p=` is used.
 - Store only source data needed to reconstruct the plan: plan settings and plan vacation days, categories and category vacation days, tasks and task vacation days, dependencies, external dependencies, teams, resource overrides, compact completed-task intervals, working-day adjustments, week resources, and manual allocation overrides.
 - The compact payload includes the plan name so exported JSON and copied URLs reopen with the same plan name.
-- The compact document is a positional array schema, not a human-readable object schema. It uses implicit IDs from row order, numeric cross-references, palette indexes for built-in colors, numeric external-dependency status codes, and omitted defaults.
+- The compact document is a positional array schema, not a human-readable object schema. It uses implicit IDs from row order, numeric cross-references for task/category dependency endpoints, string tokens for external dependency predecessor endpoints, palette indexes for built-in colors, numeric external-dependency status codes, and omitted defaults.
 - Do not store generated weeks, generated sprints, computed schedule rows, timestamps, or long UUIDs.
 - Runtime short IDs such as `p1`, `c1`, `t1`, `d1`, and `team1` are regenerated from row order on load rather than persisted in the URL.
 - The encoder always picks the shortest valid payload representation.

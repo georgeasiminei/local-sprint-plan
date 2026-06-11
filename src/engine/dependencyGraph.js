@@ -2,26 +2,44 @@ import { getEntityTasks, normalizeDependencyEndpointType } from '../utils/depend
 
 export function expandDependenciesToTaskEdges(tasks = [], categories = [], dependencies = []) {
   return dependencies.flatMap((dependency) => {
+    const document = {
+      tasks,
+      categories,
+      externalDependencies: dependency.externalDependencies ?? [],
+    };
     const predecessorType = normalizeDependencyEndpointType(
-      { tasks, categories },
+      document,
       dependency.predecessorId ?? dependency.fromTaskId,
       dependency.predecessorType,
     );
     const successorType = normalizeDependencyEndpointType(
-      { tasks, categories },
+      document,
       dependency.successorId ?? dependency.toTaskId,
       dependency.successorType,
     );
     const predecessorId = dependency.predecessorId ?? dependency.fromTaskId;
     const successorId = dependency.successorId ?? dependency.toTaskId;
-    const predecessorTasks = getEntityTasks(tasks, categories, predecessorType, predecessorId);
     const successorTasks = getEntityTasks(tasks, categories, successorType, successorId);
+
+    if (predecessorType === 'external') {
+      return successorTasks.map((successorTask) => ({
+        ...dependency,
+        predecessorId,
+        predecessorType,
+        successorId: successorTask.id,
+        successorType: 'task',
+      }));
+    }
+
+    const predecessorTasks = getEntityTasks(tasks, categories, predecessorType, predecessorId);
 
     return predecessorTasks.flatMap((predecessorTask) =>
       successorTasks.map((successorTask) => ({
         ...dependency,
         predecessorId: predecessorTask.id,
+        predecessorType: 'task',
         successorId: successorTask.id,
+        successorType: 'task',
       })),
     );
   });
@@ -35,6 +53,10 @@ export function buildDependencyGraph(tasks = [], dependencies = [], categories =
   for (const dependency of expandDependenciesToTaskEdges(tasks, categories, dependencies)) {
     const predecessorId = dependency.predecessorId;
     const successorId = dependency.successorId;
+
+    if (dependency.predecessorType === 'external') {
+      continue;
+    }
 
     if (!taskIds.has(predecessorId) || !taskIds.has(successorId)) {
       continue;

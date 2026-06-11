@@ -1,4 +1,5 @@
 import { useTimelineStore } from '../../store/index.js';
+import { isPastWeek } from '../../engine/timeline.js';
 import { CATEGORY_COLUMN_WIDTH, TASK_COLUMN_WIDTH } from './layout.js';
 
 const NOTE_BOX_WIDTH = 224;
@@ -75,6 +76,7 @@ function createExternalDependencyNoteMarkers(document, weekColumnWidth) {
       }
 
       const lineIndex = weekIndex + 1;
+      const week = document.weeks[weekIndex];
       return {
         key: `external-notes-${dueWeek}`,
         left: `${lineIndex * weekColumnWidth}px`,
@@ -85,7 +87,7 @@ function createExternalDependencyNoteMarkers(document, weekColumnWidth) {
             weekCount,
             weekColumnWidth,
           });
-          const style = getExternalDependencyStyle(dependency.status);
+          const style = getExternalDependencyStyle(getExternalDependencyTone(dependency, week));
           return {
             id: dependency.id,
             key: dependency.id,
@@ -182,16 +184,34 @@ function getBoxLabel(box) {
   return box.side === 'left' ? `${box.text} ->` : `<- ${box.text}`;
 }
 
-function getExternalDependencyStyle(status) {
-  if (status === 'yes') {
+function getExternalDependencyTone(dependency, week) {
+  if (dependency.status === 'yes') {
+    return 'complete';
+  }
+
+  if (dependency.status === 'partial') {
+    return 'partial';
+  }
+
+  return isPastWeek(week) ? 'overdue' : 'pending';
+}
+
+function getExternalDependencyStyle(tone) {
+  if (tone === 'complete') {
     return {
       boxClass: 'border-emerald-300 bg-emerald-50 text-emerald-950',
     };
   }
 
-  if (status === 'partial') {
+  if (tone === 'partial') {
     return {
-      boxClass: 'border-slate-300 bg-white text-slate-700',
+      boxClass: 'border-yellow-300 bg-yellow-100 text-yellow-950',
+    };
+  }
+
+  if (tone === 'pending') {
+    return {
+      boxClass: 'border-slate-400 bg-slate-100 text-slate-800',
     };
   }
 

@@ -402,6 +402,27 @@ describe('recalculateSchedule', () => {
     expect(result.weeks.at(-1).weekIndex).toBe(14);
   });
 
+  it('starts task successors after an external dependency due week', () => {
+    const document = createPlanDocument({ startWeek: 1, startingResourceCount: 5 });
+    document.externalDependencies = [{ id: 'x1', name: 'Vendor input', dueWeek: 4, status: 'yes' }];
+    document.tasks = [{ id: 'task-1', name: 'Implementation', priority: 1, estimateWeeks: 1 }];
+    document.dependencies = [
+      {
+        id: 'dep-1',
+        predecessorType: 'external',
+        predecessorId: 'x1',
+        successorType: 'task',
+        successorId: 'task-1',
+      },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule).toEqual([
+      { taskId: 'task-1', weekIndex: 5, allocatedUnits: 1, isManual: false },
+    ]);
+  });
+
   it('waits for all predecessor category tasks before scheduling a successor category', () => {
     const document = createPlanDocument({ startWeek: 1, startingResourceCount: 5 });
     document.categories = [
