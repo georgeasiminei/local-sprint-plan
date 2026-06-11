@@ -400,6 +400,22 @@ function ExternalDependencyEditor({ dependency, document, onDelete, onRequestWee
         onCycle={() => onUpdate(dependency.id, { status: getNextStatus(dependency.status) })}
       />
 
+      <label className="block text-sm font-medium">
+        Related task
+        <Select
+          className="mt-1 w-full"
+          value={dependency.relatedTaskId ?? ''}
+          onChange={(event) => onUpdate(dependency.id, { relatedTaskId: event.target.value || null })}
+        >
+          <option value="">No related task</option>
+          {(document.tasks ?? []).map((task) => (
+            <option key={task.id} value={task.id}>
+              {task.name}
+            </option>
+          ))}
+        </Select>
+      </label>
+
       <Button variant="ghost" className="w-full justify-center text-red-700 hover:text-red-800" onClick={onDelete}>
         <Trash2 size={16} />
         Delete dependency

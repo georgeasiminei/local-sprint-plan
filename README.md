@@ -52,6 +52,7 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 - Today is shown as a thin blue line positioned within the current week, while external dependency deadline lines keep their status colors on week borders.
 - External dependencies are thin full-height deadline lines; their editable text boxes sit in a dependency lane below the table, and due weeks use planning labels such as `26.12`.
 - External dependency colors are status and date aware: incomplete past-due markers are red, incomplete future markers are dark grey, partial markers are yellow, and completed markers are green.
+- External dependencies can optionally relate to a task for visual context. Hovering an external dependency highlights that related task and any task/category successors that hard-depend on the external dependency.
 - Rows and week columns use fixed configurable pixel sizes with clipped text so the grid stays compact and spreadsheet-like.
 - The total effort row shows assigned/capacity per week. Click a week header or total-effort cell to edit week resources, working days, and vacation days in the week panel.
 - Week resource edits apply to that week and following weeks by default; the week panel can limit the change to only the selected week.

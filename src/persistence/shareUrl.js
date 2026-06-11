@@ -114,6 +114,7 @@ export function compactPlanDocument(document) {
         dependency.dueWeek ?? dependency.endWeek ?? dependency.startWeek,
         STATUS_TO_CODE[dependency.status] ?? null,
         dependency.notes || null,
+        dependency.relatedTaskId ? taskIndex.get(dependency.relatedTaskId) : null,
       ]),
     ),
     compactTeams(document.teams, firstResourceByTeam),
@@ -205,6 +206,7 @@ export function expandCompactPlanDocument(compactDocument) {
     dueWeek: dependency[1] ?? startWeek,
     status: CODE_TO_STATUS[dependency[2] ?? 0] ?? 'no',
     notes: dependency[3] ?? '',
+    relatedTaskId: dependency[4] === null || dependency[4] === undefined ? null : `t${dependency[4] + 1}`,
   }));
   const freedays = (compactDocument[6] ?? []).map((freeday = [], index) => ({
     id: `f${index + 1}`,

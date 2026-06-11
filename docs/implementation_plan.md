@@ -14,7 +14,7 @@ Build and maintain a live local-only React planning app whose single active plan
 - Timeline cells use fixed configurable row height / week width with clipped text and thin spreadsheet-style task row borders.
 - Week header and total-effort tooltips are generated locally from each week `startDate`. They show the Monday-Friday date range and quarter, including split-quarter labels such as `Q2/Q3`, with no external calendar requests or runtime data transmission.
 - `View starting week` is a render-only old-column cutoff. It accepts an absolute planning week label such as `26.21` or a relative number such as `5`, meaning current week plus five earlier weeks. The cutoff is snapped backward to the containing sprint start so visible sprint headers remain whole.
-- External dependencies are deadline markers with notes and status, rendered as thin full-height timeline lines with editable note boxes in a lane below the table. Deadline weeks are edited as planning labels such as `26.12`. Incomplete past-due markers are red, incomplete future markers are dark grey, partial markers are yellow, and completed markers are green.
+- External dependencies are deadline markers with notes, status, and an optional visual-only related task, rendered as thin full-height timeline lines with editable note boxes in a lane below the table. Deadline weeks are edited as planning labels such as `26.12`. Incomplete past-due markers are red, incomplete future markers are dark grey, partial markers are yellow, and completed markers are green.
 
 ## Key Behaviors
 
@@ -23,6 +23,7 @@ Build and maintain a live local-only React planning app whose single active plan
 - Plan edits debounce `history.replaceState` updates.
 - Week and task-completion boundaries use local calendar dates, matching the date-only planning-week UI rather than treating those labels as UTC instants.
 - View-window filtering is applied only to timeline rendering. It must not mutate generated weeks, scheduling inputs, task resource rules, external dependency due weeks, manual allocations, or exported schedule data.
+- External dependency hover highlighting is render-only. The highlight set is derived from the external dependency's optional `relatedTaskId` plus hard internal dependencies where that external dependency is the predecessor. Only hard dependencies affect scheduling.
 - `Save` and `Load` manage named manual snapshots in `localStorage`; saving always prompts for a name, updates the current saved snapshot when the name is unchanged, creates a new snapshot when the name changes, and applies the submitted name to the active plan. Loading a named snapshot applies that saved name to the active plan.
 - Task resource edits are source rules that apply from the edited week onward.
 - Task cells are selection-only on single click. Double-click opens one compact 2-by-2 Set/Unset/cancel editor so blur, clicking elsewhere, or accidental selection cannot create a resource override.

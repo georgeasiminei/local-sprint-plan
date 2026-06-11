@@ -107,6 +107,20 @@ describe('validatePlanDocument', () => {
     expect(result.errors).toContain('Dependency dep-1 successorType must be task or category.');
   });
 
+  it('rejects external dependencies with missing related tasks', () => {
+    const result = validatePlanDocument(
+      createPlanFixture({
+        tasks: [{ id: 'task-1', name: 'One', priority: 1, estimateWeeks: 1 }],
+        externalDependencies: [
+          { id: 'external-1', name: 'Client input', dueWeek: 3, status: 'no', relatedTaskId: 'task-missing' },
+        ],
+      }),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('External dependency external-1 references a missing related task.');
+  });
+
   it('rejects non-boolean internal dependency line settings', () => {
     const result = validatePlanDocument(
       createPlanFixture({

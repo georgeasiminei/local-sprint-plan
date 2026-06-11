@@ -7,6 +7,7 @@ const MIN_CENTERED_BOX_WIDTH = 120;
 
 export default function ExternalDependencyNotes({ document, weekColumnWidth }) {
   const selectExternalDependency = useTimelineStore((state) => state.selectExternalDependency);
+  const setHoveredExternalDependency = useTimelineStore((state) => state.setHoveredExternalDependency);
   const markers = createExternalDependencyNoteMarkers(document, weekColumnWidth);
 
   if (markers.length === 0) {
@@ -41,6 +42,10 @@ export default function ExternalDependencyNotes({ document, weekColumnWidth }) {
                 data-tooltip={box.text}
                 title={box.text}
                 style={{ top: `${12 + box.stack * 34}px`, width: box.width, ...getBoxPositionStyle(box) }}
+                onMouseEnter={() => setHoveredExternalDependency(box.id)}
+                onMouseLeave={() => setHoveredExternalDependency(null)}
+                onFocus={() => setHoveredExternalDependency(box.id)}
+                onBlur={() => setHoveredExternalDependency(null)}
                 onClick={() => selectExternalDependency(box.id)}
               >
                 {getBoxLabel(box)}

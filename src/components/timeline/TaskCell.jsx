@@ -18,6 +18,7 @@ export default function TaskCell({
   isLocked,
   isEditable = true,
   isSelected = false,
+  isExternallyHighlighted = false,
   shiftRule = null,
   cellColor,
 }) {
@@ -125,8 +126,8 @@ export default function TaskCell({
       tabIndex={week && taskId ? 0 : undefined}
       aria-label={week && taskId ? getCellLabel(taskName, week, isEditable && !isLocked) : undefined}
       className={`relative overflow-visible border-b border-r border-slate-200 px-1 text-center text-xs ${
-        isSelected ? 'ring-2 ring-inset ring-focus/60' : ''
-      }`}
+        isExternallyHighlighted ? 'bg-yellow-50' : ''
+      } ${isSelected ? 'ring-2 ring-inset ring-focus/60' : isExternallyHighlighted ? 'ring-2 ring-inset ring-yellow-300' : ''}`}
       style={{ height: rowHeight, lineHeight: `${rowHeight}px`, ...(cellColor ? { backgroundColor: cellColor } : {}) }}
       onClick={(event) => {
         event.stopPropagation();

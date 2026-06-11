@@ -49,8 +49,7 @@ export default function EffortSummaryRow({ document, rowHeight, weekColumnWidth 
               className="app-tooltip overflow-hidden border-b border-r border-slate-200 px-1 text-center text-[11px] font-medium text-slate-700 hover:bg-white"
               style={{ height: rowHeight, lineHeight: `${rowHeight}px` }}
               aria-label={`Open week ${week.label}`}
-              data-tooltip={tooltip}
-              title={tooltip}
+              data-tooltip={tooltip || undefined}
               onClick={(event) => {
                 event.stopPropagation();
                 selectWeek(week.weekIndex);

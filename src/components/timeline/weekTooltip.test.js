@@ -8,7 +8,7 @@ describe('formatWeekTooltip', () => {
         label: '26.25',
         startDate: '2026-06-15',
       }),
-    ).toBe('26.25 · Jun 15 - 19 · Q2');
+    ).toBe('Jun 15 - 19 · Q2');
   });
 
   it('formats cross-month workweek dates with both quarters when needed', () => {
@@ -17,10 +17,10 @@ describe('formatWeekTooltip', () => {
         label: '26.27',
         startDate: '2026-06-29',
       }),
-    ).toBe('26.27 · Jun 29 - Jul 3 · Q2/Q3');
+    ).toBe('Jun 29 - Jul 3 · Q2/Q3');
   });
 
-  it('falls back to the week label when dates are missing', () => {
-    expect(formatWeekTooltip({ label: '26.25' })).toBe('26.25');
+  it('returns no tooltip when dates are missing', () => {
+    expect(formatWeekTooltip({ label: '26.25' })).toBe('');
   });
 });

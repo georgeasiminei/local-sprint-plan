@@ -1,9 +1,13 @@
 import CategoryTaskGroup from './CategoryTaskGroup.jsx';
 import EffortSummaryRow from './EffortSummaryRow.jsx';
+import { useTimelineStore } from '../../store/index.js';
+import { getExternalDependencyHighlightTaskIds } from '../../utils/externalDependencyHighlights.js';
 
 export default function GridBody({ document, allocationView, rowHeight, weekColumnWidth }) {
+  const hoveredExternalDependencyId = useTimelineStore((state) => state.hoveredExternalDependencyId);
   const uncategorizedTasks = document.tasks.filter((task) => !task.categoryId);
   const categories = [...document.categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const highlightedTaskIds = getExternalDependencyHighlightTaskIds(document, hoveredExternalDependencyId);
 
   return (
     <div>
@@ -20,6 +24,7 @@ export default function GridBody({ document, allocationView, rowHeight, weekColu
             tasks={tasks}
             weeks={document.weeks}
             weekColumnWidth={weekColumnWidth}
+            highlightedTaskIds={highlightedTaskIds}
           />
         );
       })}
@@ -34,6 +39,7 @@ export default function GridBody({ document, allocationView, rowHeight, weekColu
           tasks={uncategorizedTasks}
           weeks={document.weeks}
           weekColumnWidth={weekColumnWidth}
+          highlightedTaskIds={highlightedTaskIds}
         />
       ) : null}
       {document.tasks.length === 0 ? (

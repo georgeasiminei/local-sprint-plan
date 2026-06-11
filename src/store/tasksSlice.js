@@ -97,6 +97,10 @@ export function createTasksSlice(set, get) {
               !((item.predecessorType ?? 'task') === 'task' && item.predecessorId === taskId) &&
               !((item.successorType ?? 'task') === 'task' && item.successorId === taskId),
           ),
+        externalDependencies: (dependencies) =>
+          dependencies.map((dependency) =>
+            dependency.relatedTaskId === taskId ? { ...dependency, relatedTaskId: null } : dependency,
+          ),
         schedule: (schedule) => schedule.filter((item) => item.taskId !== taskId),
       }),
     shiftTaskRemainder: (taskId, anchorWeekIndex, weekDelta, shiftId = null) =>
