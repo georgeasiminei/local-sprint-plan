@@ -64,6 +64,49 @@ describe('validatePlanDocument', () => {
     expect(result.valid).toBe(true);
   });
 
+  it('accepts dependencies from external markers to tasks', () => {
+    const result = validatePlanDocument(
+      createPlanFixture({
+        tasks: [{ id: 'task-1', name: 'One', priority: 1, estimateWeeks: 1 }],
+        externalDependencies: [{ id: 'external-1', name: 'Client input', dueWeek: 3, status: 'no' }],
+        dependencies: [
+          {
+            id: 'dep-1',
+            predecessorType: 'external',
+            predecessorId: 'external-1',
+            successorType: 'task',
+            successorId: 'task-1',
+            lagWeeks: 0,
+          },
+        ],
+      }),
+    );
+
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects dependencies that use external markers as waiting items', () => {
+    const result = validatePlanDocument(
+      createPlanFixture({
+        tasks: [{ id: 'task-1', name: 'One', priority: 1, estimateWeeks: 1 }],
+        externalDependencies: [{ id: 'external-1', name: 'Client input', dueWeek: 3, status: 'no' }],
+        dependencies: [
+          {
+            id: 'dep-1',
+            predecessorType: 'task',
+            predecessorId: 'task-1',
+            successorType: 'external',
+            successorId: 'external-1',
+            lagWeeks: 0,
+          },
+        ],
+      }),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Dependency dep-1 successorType must be task or category.');
+  });
+
   it('rejects non-boolean internal dependency line settings', () => {
     const result = validatePlanDocument(
       createPlanFixture({

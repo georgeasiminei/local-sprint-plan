@@ -17,7 +17,19 @@ export function recalculateSchedule(document) {
   const tasks = [...(document.tasks ?? [])].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
   const dependencies = document.dependencies ?? [];
   const categories = document.categories ?? [];
-  const expandedDependencies = expandDependenciesToTaskEdges(tasks, categories, dependencies);
+  const externalDependencyById = new Map((document.externalDependencies ?? []).map((dependency) => [dependency.id, dependency]));
+  const expandedDependencies = expandDependenciesToTaskEdges(tasks, categories, dependencies).map((dependency) => {
+    if (dependency.predecessorType !== 'external') {
+      return dependency;
+    }
+
+    const externalDependency = externalDependencyById.get(dependency.predecessorId);
+    return {
+      ...dependency,
+      predecessorDueWeek:
+        externalDependency?.dueWeek ?? externalDependency?.endWeek ?? externalDependency?.startWeek ?? null,
+    };
+  });
   const firstTeam = document.teams?.[0];
   const startWeek = Number(document.plan?.startWeek) || 1;
   const startYear = Number(document.plan?.startYear) || new Date().getFullYear();
@@ -439,6 +451,12 @@ function getRawAllocationForEffectiveAllocation(
 function getEarliestStartWeek(task, dependenciesBySuccessor, completionWeekByTask, fallbackStartWeek) {
   const taskStartWeek = task.earliestStartWeek ?? fallbackStartWeek;
   const dependencyStartWeek = (dependenciesBySuccessor.get(task.id) ?? []).reduce((latestWeek, dependency) => {
+    if (dependency.predecessorType === 'external') {
+      return dependency.predecessorDueWeek
+        ? Math.max(latestWeek, dependency.predecessorDueWeek + (dependency.lagWeeks ?? 0) + 1)
+        : latestWeek;
+    }
+
     const predecessorCompletionWeek = completionWeekByTask.get(dependency.predecessorId);
     if (!predecessorCompletionWeek) {
       return latestWeek;

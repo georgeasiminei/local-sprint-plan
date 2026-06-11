@@ -170,6 +170,7 @@ export default function DependencyDetailPanel({ document }) {
                 className="mt-1 w-full"
                 document={document}
                 type={predecessorType}
+                allowedTypes={['task', 'category', 'external']}
                 disabledOptionIds={getBlockedEndpointIds(document, {
                   side: 'predecessor',
                   type: predecessorType,
@@ -191,6 +192,7 @@ export default function DependencyDetailPanel({ document }) {
                 className="mt-1 w-full"
                 document={document}
                 type={successorType}
+                allowedTypes={['task', 'category']}
                 disabledOptionIds={getBlockedEndpointIds(document, {
                   side: 'successor',
                   type: successorType,
@@ -287,6 +289,7 @@ function InternalDependencyEditor({ dependency, document, onDelete, onUpdate }) 
           className="mt-1 w-full"
           document={document}
           type={draftPredecessorType}
+          allowedTypes={['task', 'category', 'external']}
           disabledOptionIds={getBlockedEndpointIds(document, {
             side: 'predecessor',
             type: draftPredecessorType,
@@ -314,6 +317,7 @@ function InternalDependencyEditor({ dependency, document, onDelete, onUpdate }) 
           className="mt-1 w-full"
           document={document}
           type={draftSuccessorType}
+          allowedTypes={['task', 'category']}
           disabledOptionIds={getBlockedEndpointIds(document, {
             side: 'successor',
             type: draftSuccessorType,
@@ -449,6 +453,7 @@ function DependencyLists({ document }) {
 }
 
 function DependencyEntitySelect({
+  allowedTypes,
   className,
   disabledOptionIds = [],
   document,
@@ -459,18 +464,19 @@ function DependencyEntitySelect({
   value,
 }) {
   const options = getDependencyEntityOptions(document, type);
+  const endpointTypes = allowedTypes ?? ['task', 'category'];
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        {['task', 'category'].map((candidateType) => (
+      <div className={`grid gap-2 ${endpointTypes.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {endpointTypes.map((candidateType) => (
           <Button
             key={candidateType}
             type="button"
             variant={type === candidateType ? 'primary' : 'secondary'}
             onClick={() => onTypeChange(candidateType)}
           >
-            {candidateType === 'task' ? 'Task' : 'Category'}
+            {getDependencyTypeLabel(candidateType)}
           </Button>
         ))}
       </div>
@@ -522,8 +528,20 @@ function getBlockedEndpointIds(document, { side, type, oppositeType, oppositeId,
 
 function formatDependencyEndpoint(document, dependency, side) {
   const endpoint = getDependencyEndpoint(document, dependency, side);
-  const prefix = endpoint.type === 'category' ? 'Category: ' : 'Task: ';
+  const prefix = `${getDependencyTypeLabel(endpoint.type)}: `;
   return `${prefix}${getDependencyEntityName(document, endpoint.type, endpoint.id)}`;
+}
+
+function getDependencyTypeLabel(type) {
+  if (type === 'category') {
+    return 'Category';
+  }
+
+  if (type === 'external') {
+    return 'External';
+  }
+
+  return 'Task';
 }
 
 function StatusCycleButton({ status, onCycle }) {

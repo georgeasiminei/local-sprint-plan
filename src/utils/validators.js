@@ -93,7 +93,13 @@ export function validatePlanDocument(document) {
   const weekIndexes = new Set(document.weeks.map((week) => week.weekIndex));
 
   validateTasks(document.tasks, categoryIds, errors);
-  validateDependencies(document.dependencies, taskIds, categoryIds, errors);
+  validateDependencies(
+    document.dependencies,
+    taskIds,
+    categoryIds,
+    new Set(document.externalDependencies.map((dependency) => dependency.id)),
+    errors,
+  );
   validateExternalDependencies(document.externalDependencies, errors);
   validateWeeks(document.weeks, errors);
   validateSprints(document.sprints, weekIndexes, errors);
@@ -233,24 +239,24 @@ function validateTasks(tasks, categoryIds, errors) {
   }
 }
 
-function validateDependencies(dependencies, taskIds, categoryIds, errors) {
+function validateDependencies(dependencies, taskIds, categoryIds, externalDependencyIds, errors) {
   for (const dependency of dependencies) {
     const predecessorType = dependency.predecessorType ?? 'task';
     const successorType = dependency.successorType ?? 'task';
 
     if (!isKnownDependencyType(predecessorType)) {
-      errors.push(`Dependency ${dependency.id} predecessorType must be task or category.`);
+      errors.push(`Dependency ${dependency.id} predecessorType must be task, category, or external.`);
     }
 
-    if (!isKnownDependencyType(successorType)) {
+    if (!isKnownDependencyTargetType(successorType)) {
       errors.push(`Dependency ${dependency.id} successorType must be task or category.`);
     }
 
-    if (!hasEntity(predecessorType, dependency.predecessorId, taskIds, categoryIds)) {
+    if (!hasEntity(predecessorType, dependency.predecessorId, taskIds, categoryIds, externalDependencyIds)) {
       errors.push(`Dependency ${dependency.id} references a missing predecessor ${predecessorType ?? 'entity'}.`);
     }
 
-    if (!hasEntity(successorType, dependency.successorId, taskIds, categoryIds)) {
+    if (!hasEntity(successorType, dependency.successorId, taskIds, categoryIds, externalDependencyIds)) {
       errors.push(`Dependency ${dependency.id} references a missing successor ${successorType ?? 'entity'}.`);
     }
 
@@ -264,11 +270,23 @@ function validateDependencies(dependencies, taskIds, categoryIds, errors) {
   }
 }
 
-function hasEntity(type, id, taskIds, categoryIds) {
-  return type === 'category' ? categoryIds.has(id) : taskIds.has(id);
+function hasEntity(type, id, taskIds, categoryIds, externalDependencyIds) {
+  if (type === 'category') {
+    return categoryIds.has(id);
+  }
+
+  if (type === 'external') {
+    return externalDependencyIds.has(id);
+  }
+
+  return taskIds.has(id);
 }
 
 function isKnownDependencyType(type) {
+  return type === 'task' || type === 'category' || type === 'external';
+}
+
+function isKnownDependencyTargetType(type) {
   return type === 'task' || type === 'category';
 }
 

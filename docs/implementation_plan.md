@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Build a local-only React planning app whose single active plan is owned by the browser URL hash. There is no backend, account system, database, JSON import/export flow, or multi-plan manager. Named `localStorage` saves exist only as explicit user-created snapshots.
+Build and maintain a live local-only React planning app whose single active plan is owned by the browser URL hash. There is no backend, account system, database, JSON import/export flow, or multi-plan manager. Named `localStorage` saves exist only as explicit user-created snapshots. Because the project is live, compatibility for existing shared URLs and established workflows is a first-class requirement unless a breaking change is explicitly approved and documented with migration steps.
 
 ## Current Architecture
 
@@ -12,7 +12,7 @@ Build a local-only React planning app whose single active plan is owned by the b
 - Weeks are generated from ISO week-year settings and labeled as `YY.WW`.
 - Sprints are generated in fixed 2-week groups, with editable numbering from a chosen sprint onward.
 - Timeline cells use fixed configurable row height / week width with clipped text and thin spreadsheet-style task row borders.
-- External dependencies are deadline markers with notes and status, rendered as full-height timeline lines with editable note boxes in a lane below the table. Deadline weeks are edited as ISO labels such as `26.12`.
+- External dependencies are deadline markers with notes and status, rendered as thin full-height timeline lines with editable note boxes in a lane below the table. Deadline weeks are edited as ISO labels such as `26.12`. Incomplete past-due markers are red, incomplete future markers are dark grey, partial markers are yellow, and completed markers are green.
 
 ## Key Behaviors
 
@@ -34,7 +34,7 @@ Build a local-only React planning app whose single active plan is owned by the b
 - External dependency note boxes stay inside the visible timeline edge by choosing the available side and narrowing when necessary.
 - The timeline uses frozen category/task columns and compact task rows; category cells span their visible task rows like merged spreadsheet cells.
 - Tasks created from a selected category inherit category and color.
-- `Task`, `Category`, and `Dependency` open focused right-side panels with close and delete controls. New task/category starter names are selected immediately for overwrite. Dependency creation supports external deadline markers and internal task-to-task dependencies.
+- `Task`, `Category`, and `Dependency` open focused right-side panels with close and delete controls. New task/category starter names are selected immediately for overwrite. Dependency creation supports external deadline markers and internal dependencies from task, category, or external dependency predecessors to task/category successors.
 - Numeric entry uses plain edit boxes rather than browser steppers.
 - Estimates and resource values are normalized to one decimal place.
 - The timeline has a checkbox to switch between editable resource allocation view and read-only effective resource view. The total effort row shows effective allocation/resource allocation.
@@ -44,10 +44,11 @@ Build a local-only React planning app whose single active plan is owned by the b
 
 ## Compact URL State
 
-- URL state uses a positional array schema with implicit IDs, numeric cross-references, palette-index colors, numeric dependency statuses, and omitted defaults.
+- URL state uses a positional array schema with implicit IDs, numeric cross-references for task/category dependency endpoints, string tokens for external dependency predecessor endpoints, palette-index colors, numeric dependency statuses, and omitted defaults.
 - Plan vacation days, categories, category vacation days, tasks, task vacation days, dependencies, external dependencies, teams, working-day adjustments, week resources, and manual/resource overrides are preserved as source data.
 - URL payloads use a single `d.` base64url deflate-raw format.
 - The current compact URL format is the first shipped hash format. If that positional schema ever changes incompatibly, add explicit URL-format versioning and migration before emitting the new format; object-document migrations alone are not enough for old shared links.
+- Keep Markdown documents current when behavior changes, especially the requirements, README, and this implementation plan.
 
 ## Verification
 

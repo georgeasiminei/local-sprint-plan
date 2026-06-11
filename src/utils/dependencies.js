@@ -1,4 +1,4 @@
-export const DEPENDENCY_ENTITY_TYPES = ['task', 'category'];
+export const DEPENDENCY_ENTITY_TYPES = ['task', 'category', 'external'];
 
 export function normalizeDependencyEndpointType(document, entityId, explicitType) {
   if (DEPENDENCY_ENTITY_TYPES.includes(explicitType)) {
@@ -13,13 +13,22 @@ export function normalizeDependencyEndpointType(document, entityId, explicitType
     return 'category';
   }
 
+  if ((document.externalDependencies ?? []).some((dependency) => dependency.id === entityId)) {
+    return 'external';
+  }
+
   return null;
 }
 
 export function getDependencyEndpoint(document, dependency, side) {
   const id = dependency?.[`${side}Id`] ?? null;
   const type = normalizeDependencyEndpointType(document, id, dependency?.[`${side}Type`]);
-  const collection = type === 'category' ? document.categories ?? [] : document.tasks ?? [];
+  const collection =
+    type === 'category'
+      ? document.categories ?? []
+      : type === 'external'
+        ? document.externalDependencies ?? []
+        : document.tasks ?? [];
   const entity = collection.find((item) => item.id === id) ?? null;
 
   return { id, type, entity };
@@ -28,6 +37,10 @@ export function getDependencyEndpoint(document, dependency, side) {
 export function getDependencyEntityName(document, type, id) {
   if (type === 'category') {
     return (document.categories ?? []).find((category) => category.id === id)?.name ?? 'Missing category';
+  }
+
+  if (type === 'external') {
+    return (document.externalDependencies ?? []).find((dependency) => dependency.id === id)?.name ?? 'Missing external dependency';
   }
 
   return (document.tasks ?? []).find((task) => task.id === id)?.name ?? 'Missing task';
@@ -46,12 +59,20 @@ export function getEntityTasks(tasks = [], categories = [], type, id) {
     return tasks.filter((task) => task.categoryId === id);
   }
 
+  if (type === 'external') {
+    return [];
+  }
+
   return tasks.filter((task) => task.id === id);
 }
 
 export function getDependencyEntityOptions(document, type) {
   if (type === 'category') {
     return (document.categories ?? []).map((category) => ({ id: category.id, name: category.name }));
+  }
+
+  if (type === 'external') {
+    return (document.externalDependencies ?? []).map((dependency) => ({ id: dependency.id, name: dependency.name }));
   }
 
   return (document.tasks ?? []).map((task) => ({ id: task.id, name: task.name }));

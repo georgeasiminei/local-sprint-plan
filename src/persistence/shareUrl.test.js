@@ -213,6 +213,36 @@ describe('URL plan payloads', () => {
     });
   });
 
+  it('round trips external predecessor dependency endpoints in the compact URL format', async () => {
+    const document = createPlanFixture({
+      tasks: [{ id: 'task-1', name: 'Implementation', priority: 1, estimateWeeks: 3 }],
+      externalDependencies: [{ id: 'external-1', name: 'Client input', dueWeek: 4, status: 'no' }],
+      dependencies: [
+        {
+          id: 'dep-1',
+          predecessorType: 'external',
+          predecessorId: 'external-1',
+          successorType: 'task',
+          successorId: 'task-1',
+          lagWeeks: 1,
+        },
+      ],
+    });
+
+    const compact = compactPlanDocument(document);
+    const decoded = await decodePlanFromHashPayload(await encodePlanToHashPayload(document));
+
+    expect(compact[3][0]).toEqual(['x0', 0, 1]);
+    expect(decoded.dependencies[0]).toMatchObject({
+      predecessorType: 'external',
+      predecessorId: 'x1',
+      successorType: 'task',
+      successorId: 't1',
+      lagWeeks: 1,
+    });
+    expect(validatePlanDocument(decoded).valid).toBe(true);
+  });
+
   it('stores completed task history as compact resource intervals', async () => {
     const document = createPlanFixture({
       tasks: [
