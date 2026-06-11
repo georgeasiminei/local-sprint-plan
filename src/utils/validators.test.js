@@ -117,4 +117,15 @@ describe('validatePlanDocument', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Plan showInternalDependencyLines must be a boolean.');
   });
+
+  it('rejects non-string view starting week settings', () => {
+    const result = validatePlanDocument(
+      createPlanFixture({
+        plan: { viewStartWeek: 5 },
+      }),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Plan viewStartWeek must be a string.');
+  });
 });

@@ -340,6 +340,18 @@ describe('URL plan payloads', () => {
     ]);
   });
 
+  it('round trips view starting week in compact URL state', async () => {
+    const document = createPlanFixture({
+      plan: { viewStartWeek: '26.21' },
+    });
+
+    const compact = compactPlanDocument(document);
+    const decoded = await decodePlanFromHashPayload(await encodePlanToHashPayload(document));
+
+    expect(compact[0][11]).toBe('26.21');
+    expect(decoded.plan.viewStartWeek).toBe('26.21');
+  });
+
   it('keeps large encoded plans compact relative to runtime JSON', async () => {
     const document = createPlanFixture({
       categories: Array.from({ length: 6 }, (_, index) => ({

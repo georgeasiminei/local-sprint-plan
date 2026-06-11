@@ -244,6 +244,7 @@ export function expandCompactPlanDocument(compactDocument) {
       vacations: expandWeekValuePairs(planRow[8]).map(({ weekIndex, value }) => ({ weekIndex, dayCount: value })),
       weekColumnWidth: planRow[9] ?? DEFAULT_WEEK_COLUMN_WIDTH,
       showInternalDependencyLines: planRow[10] !== 0,
+      viewStartWeek: planRow[11] ?? '',
       createdAt: now,
       updatedAt: now,
     },
@@ -304,6 +305,7 @@ function compactPlan(plan, { firstWeekIndex, sprintStartNumber, sprintStartOrder
     compactRows(plan?.vacations, (vacation) => [vacation.weekIndex, vacation.dayCount]),
     plan?.weekColumnWidth && plan.weekColumnWidth !== DEFAULT_WEEK_COLUMN_WIDTH ? plan.weekColumnWidth : null,
     plan?.showInternalDependencyLines === false ? 0 : null,
+    plan?.viewStartWeek || null,
   ]);
 }
 
