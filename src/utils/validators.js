@@ -104,7 +104,7 @@ export function validatePlanDocument(document) {
     new Set(document.externalDependencies.map((dependency) => dependency.id)),
     errors,
   );
-  validateExternalDependencies(document.externalDependencies, errors);
+  validateExternalDependencies(document.externalDependencies, taskIds, errors);
   validateWeeks(document.weeks, errors);
   validateSprints(document.sprints, weekIndexes, errors);
   validateTeams(document.teams, errors);
@@ -294,7 +294,7 @@ function isKnownDependencyTargetType(type) {
   return type === 'task' || type === 'category';
 }
 
-function validateExternalDependencies(externalDependencies, errors) {
+function validateExternalDependencies(externalDependencies, taskIds, errors) {
   for (const dependency of externalDependencies) {
     if (!dependency.name) {
       errors.push(`External dependency ${dependency.id} must include a name.`);
@@ -307,6 +307,10 @@ function validateExternalDependencies(externalDependencies, errors) {
 
     if (dependency.status !== undefined && !['yes', 'partial', 'no'].includes(dependency.status)) {
       errors.push(`External dependency ${dependency.id} status must be yes, partial, or no.`);
+    }
+
+    if (dependency.relatedTaskId !== null && dependency.relatedTaskId !== undefined && !taskIds.has(dependency.relatedTaskId)) {
+      errors.push(`External dependency ${dependency.id} references a missing related task.`);
     }
   }
 }

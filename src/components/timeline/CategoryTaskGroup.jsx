@@ -21,6 +21,7 @@ export default function CategoryTaskGroup({
   tasks,
   weeks,
   weekColumnWidth,
+  highlightedTaskIds = new Set(),
 }) {
   const selectCategory = useTimelineStore((state) => state.selectCategory);
   const selectTask = useTimelineStore((state) => state.selectTask);
@@ -106,6 +107,7 @@ export default function CategoryTaskGroup({
             rowColor={task.highlightColor ?? category.color}
             weekColumnWidth={weekColumnWidth}
             selectTask={selectTask}
+            isExternallyHighlighted={highlightedTaskIds.has(task.id)}
           />
         ))
       ) : (
@@ -126,6 +128,7 @@ function TaskGridRow({
   rowColor,
   selectTask,
   weekColumnWidth,
+  isExternallyHighlighted = false,
 }) {
   const selectedTaskId = useTimelineStore((state) => state.selectedTaskId);
   const selectedTaskWeekIndex = useTimelineStore((state) => state.selectedTaskWeekIndex);
@@ -215,6 +218,7 @@ function TaskGridRow({
                 isLocked={task.completed || allocationView === 'effective'}
                 isEditable={allocationView === 'resource'}
                 isSelected={isSelectedWeek}
+                isExternallyHighlighted={isExternallyHighlighted}
                 shiftRule={shiftRule}
                 cellColor={entry?.allocatedUnits ? rowColor : null}
               />

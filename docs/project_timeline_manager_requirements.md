@@ -140,10 +140,11 @@ Category endpoints expand into task-level scheduling rules at runtime. A task wa
   "name": "Client test environment available",
   "dueWeek": 20,
   "status": "no",
-  "notes": ""
+  "notes": "",
+  "relatedTaskId": "task id or null"
 }
 ```
-External dependencies are deadline markers for expected outside inputs, approvals, environments, or vendor deliverables. They can also be used as predecessor-only internal dependency endpoints, where the due week acts as the predecessor handoff week. Status cycles through `no` (default), `partial`, and `yes`. A `no` marker is red when overdue and dark grey when still in the future; `partial` is always yellow; `yes` is always green.
+External dependencies are deadline markers for expected outside inputs, approvals, environments, or vendor deliverables. They can also be used as predecessor-only internal dependency endpoints, where the due week acts as the predecessor handoff week. The optional `relatedTaskId` is visual-only and has no scheduling effect. Status cycles through `no` (default), `partial`, and `yes`. A `no` marker is red when overdue and dark grey when still in the future; `partial` is always yellow; `yes` is always green.
 
 ### 3.7 Sprints
 ```json
@@ -270,7 +271,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - On wide screens, the app uses the full available browser width before horizontal scrolling is needed.
 - **Fixed compact cells:** Task rows use a configurable fixed pixel height (`plan.rowHeight`, default 19px) and week columns use a configurable fixed pixel width (`plan.weekColumnWidth`, default 48px). Text is clipped/truncated instead of wrapping so row heights stay consistent. Task-to-task separation uses thin spreadsheet-like borders; category separation remains visually stronger.
 - **Week hover tooltip:** Hovering a week header or total-effort week cell shows an internally generated Monday-Friday date range plus quarter, such as `Jun 15 - 19 · Q2` or `Jun 29 - Jul 3 · Q2/Q3`. The calendar is calculated client-side from generated week dates; the app must not call an external calendar service or send plan data outside the browser at runtime.
-- **View starting week:** Plan settings can hide old week columns before a view-only starting point. The setting accepts either an absolute planning week label such as `26.21`, or a relative number such as `5`, meaning show the current week plus five earlier weeks. This never changes scheduling, saved task dates, external dependency due weeks, or CSV data. If the requested cut would split a two-week sprint, the visible start is rounded backward to the sprint start.
+- **View starting week:** Plan settings can hide old week columns before a view-only starting point. The setting accepts either an absolute planning week label such as `26.21`, or a relative number such as `5`, meaning show the current week plus five earlier weeks. This never changes scheduling, saved task dates, external dependency due weeks, or CSV data. If the requested cut would split a two-week sprint, the visible start is rounded backward to the sprint start. Incomplete external dependencies whose due week is before the visible window remain visible at the left edge of the timeline, with a tooltip that includes the original planning due week.
 - Sprint headers span the correct number of week columns and expose editable sprint numbers.
 - Each data cell shows either raw resource allocation or effective allocation for that task-week; empty if zero.
 - **Resource allocation toggle:** A checkbox switches between resource allocation view and effective resource view. Effective resource view is read-only and includes working-day/vacation reductions. Resource allocation view is editable and shows the planned resource count before those reductions.
@@ -281,7 +282,8 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - **Dependency markers:** Vertical lines drawn on the timeline grid at the week boundary where a dependency handoff occurs (i.e., the week column where the successor task is allowed to start). The line spans the full vertical height of the grid (all task rows). Each dependency line is color-coded or labeled and shows the compact relation `Predecessor → Successor` with lag when present. Multiple dependencies at the same week column are stacked/merged into one line with a combined tooltip. Dependency lines are rendered as an SVG overlay on top of the grid, not inside individual cells, and can be shown or hidden from plan settings.
 - **Week panel access:** Clicking a week header or a total-effort cell opens the focused week panel for that planning week.
 - **Total effort row:** Displayed below task rows. Each week shows `x/y`, where `x` is calculated effective effort for that week and `y` is raw resource allocation for that week.
-- **External dependency markers:** Expected external inputs are rendered as thin full-height deadline lines on the border after the due week. These lines use red for overdue incomplete markers, dark grey for future incomplete markers, yellow for partially complete markers, and green for complete markers. Free-text boxes are displayed in a dedicated dependency lane below the task table so they do not cover schedule cells. Where space allows, same-week dependency boxes are centered on the deadline line and stack vertically; near edges they may fall to the available side / shrink as needed instead of escaping the scrollable timeline. Compact boxes may truncate long text, with the full note shown on hover.
+- **External dependency markers:** Expected external inputs are rendered as thin full-height deadline lines on the border after the due week. These lines use red for overdue incomplete markers, dark grey for future incomplete markers, yellow for partially complete markers, and green for complete markers. Free-text boxes are displayed in a dedicated dependency lane below the task table so they do not cover schedule cells. Where space allows, same-week dependency boxes are centered on the deadline line and stack vertically; near edges they may fall to the available side / shrink as needed instead of escaping the scrollable timeline. Compact boxes may truncate long text, with the full note and planning due week shown on hover. When old weeks are hidden, incomplete external dependencies from before the first visible week stay visible at the left boundary; completed hidden dependencies remain hidden.
+- **External dependency hover highlighting:** Hovering or keyboard-focusing an external dependency box highlights only non-zero timeline cells for its optional related task. If that same external dependency is also a hard internal dependency predecessor, non-zero cells for the dependent task or every task in the dependent category are highlighted as well. The related-task highlight is visual-only and does not affect scheduling.
 - **Category totals:** The merged category cell shows compact category summary values; task-week resource totals remain visible in task cells and the total effort row.
 - **Compact toolbar:** The timeline has one compact top toolbar with `Task`, `Category`, `Dependency`, shift, split, CSV export, `Save`, `Load`, `Backup/restore`, and settings actions. Save/load tooltips clarify that they use local storage, Shift explains that it moves remaining work from the selected cell, Effective resources explains the adjusted/read-only view, and the header links back to the original GitHub repository.
 - **Task split:** Select a task-week cell → Split creates a second task starting at that cell. The selected cell becomes the first week of the new task. The new task keeps the original task's category, priority placement, color, max resources, notes, and other task settings, while the original task keeps the work before the split.
@@ -301,7 +303,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 
 ### 5.3 Plan Settings Panel
 - **Timeline start:** Edit planning start year and planning start week.
-- **View starting week:** Optional view-only old-column cutoff. Accepts `YY.WW`/`YYYY.WW` or a number of weeks before the current week.
+- **View starting week:** Optional view-only old-column cutoff. Accepts `YY.WW`/`YYYY.WW` or a number of weeks before the current week. Incomplete external dependencies before the cutoff stay visible as left-boundary markers.
 - **Row height:** Edit fixed timeline row height in pixels.
 - **Week width:** Edit fixed timeline week-column width in pixels.
 - **Internal dependency lines:** Toggle whether internal dependency handoff markers are drawn on the timeline.
@@ -322,6 +324,7 @@ Recalculation is fast (< 100ms for typical plans) and runs on every state change
 - Remove existing dependency
 - Add, edit, move, and remove external dependency deadline markers by planning due week label such as `26.12`.
 - External dependency status cycles through No, Partially, and Yes via a checkbox-style control. No is red when past due and dark grey when future due; Partially is yellow; Yes is green.
+- External dependency editors can choose an optional related task for hover highlighting. This relationship is separate from hard internal dependencies and has no scheduling effect.
 - Circular dependency detection: warn and block if a cycle would be created
 - Task and category rows expose a compact internal-dependency indicator; clicking it opens the right panel list for that item so internal dependencies can be reviewed and edited after creation
 

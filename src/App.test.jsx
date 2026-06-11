@@ -300,6 +300,41 @@ describe('URL-owned app state', () => {
     );
   });
 
+  it('highlights only non-zero cells for related and hard-dependent tasks while hovering an external dependency', async () => {
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+
+    let externalDependencyId;
+    act(() => {
+      const store = useTimelineStore.getState();
+      const relatedTaskId = store.addTask({ name: 'Soft related task' });
+      const hardTaskId = store.addTask({ name: 'Hard dependent task' });
+      externalDependencyId = store.addExternalDependency({
+        name: 'Client environment',
+        dueWeek: 2,
+        status: 'no',
+        relatedTaskId,
+      });
+      store.addDependency(externalDependencyId, hardTaskId, 0, 'external', 'task');
+      store.setHoveredExternalDependency(externalDependencyId);
+    });
+
+    await waitFor(() => {
+      expect(hasHighlightedTaskCell('Soft related task', '26.01')).toBe(true);
+      expect(hasHighlightedTaskCell('Hard dependent task', '26.03')).toBe(true);
+    });
+    expect(hasHighlightedTaskCell('Soft related task', '26.02')).toBe(false);
+    expect(hasHighlightedTaskRow('Soft related task')).toBe(false);
+    expect(hasHighlightedTaskRow('Hard dependent task')).toBe(false);
+
+    act(() => {
+      useTimelineStore.getState().setHoveredExternalDependency(null);
+    });
+
+    expect(hasHighlightedTaskCell('Soft related task', '26.01')).toBe(false);
+    expect(hasHighlightedTaskCell('Hard dependent task', '26.03')).toBe(false);
+  });
+
   it('opens dependency panel with external and internal choices', async () => {
     const user = userEvent.setup();
 
@@ -1210,6 +1245,20 @@ describe('URL-owned app state', () => {
   });
 });
 
+function hasHighlightedTaskRow(taskName) {
+  return screen
+    .getAllByText(taskName)
+    .some((element) => element.closest('[data-external-highlighted="true"]'));
+}
+
+function hasHighlightedTaskCell(taskName, weekLabel) {
+  return (
+    screen
+      .queryByRole('button', { name: `Set ${taskName} resources in ${weekLabel}` })
+      ?.getAttribute('data-external-highlighted') === 'true'
+  );
+}
+
 function resetStore() {
   useTimelineStore.setState({
     activePlanId: null,
@@ -1230,6 +1279,7 @@ function resetStore() {
     showEffectiveAllocations: false,
     activePanel: 'task',
     selectedExternalDependencyId: null,
+    hoveredExternalDependencyId: null,
     selectedWeekIndex: null,
     editingResourceCell: null,
     pendingPastWeekEdit: null,

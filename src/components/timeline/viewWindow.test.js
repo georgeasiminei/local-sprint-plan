@@ -32,6 +32,7 @@ describe('timeline view window', () => {
       columnStart: 1,
       columnSpan: 2,
     });
+    expect(visibleDocument.timelineView.hiddenBeforeWeeks.map((week) => week.label)).toEqual(['26.19', '26.20']);
   });
 
   it('hides weeks relative to the current planning week and snaps back to a sprint boundary', () => {

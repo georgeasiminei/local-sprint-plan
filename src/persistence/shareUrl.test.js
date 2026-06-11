@@ -243,6 +243,24 @@ describe('URL plan payloads', () => {
     expect(validatePlanDocument(decoded).valid).toBe(true);
   });
 
+  it('round trips external dependency related tasks in compact URL state', async () => {
+    const document = createPlanFixture({
+      tasks: [{ id: 'task-1', name: 'Implementation', priority: 1, estimateWeeks: 3 }],
+      externalDependencies: [
+        { id: 'external-1', name: 'Client input', dueWeek: 4, status: 'no', relatedTaskId: 'task-1' },
+      ],
+    });
+
+    const compact = compactPlanDocument(document);
+    const decoded = await decodePlanFromHashPayload(await encodePlanToHashPayload(document));
+
+    expect(compact[4][0]).toEqual(['Client input', 4, null, null, 0]);
+    expect(decoded.externalDependencies[0]).toMatchObject({
+      id: 'x1',
+      relatedTaskId: 't1',
+    });
+  });
+
   it('stores completed task history as compact resource intervals', async () => {
     const document = createPlanFixture({
       tasks: [

@@ -120,6 +120,7 @@ export function createDependenciesSlice(set, get) {
               dueWeek,
               status: normalizeExternalDependencyStatus(dependency.status),
               notes: dependency.notes ?? '',
+              ...(dependency.relatedTaskId ? { relatedTaskId: dependency.relatedTaskId } : {}),
             },
           ],
         };

@@ -2,7 +2,7 @@ const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 
 export function formatWeekTooltip(week) {
   if (!week?.startDate) {
-    return week?.label ?? '';
+    return '';
   }
 
   const start = parseLocalDate(week.startDate);
@@ -10,7 +10,7 @@ export function formatWeekTooltip(week) {
   const dateRange = formatDateRange(start, end);
   const quarterRange = formatQuarterRange(start, end);
 
-  return [week.label, dateRange, quarterRange].filter(Boolean).join(' · ');
+  return [dateRange, quarterRange].filter(Boolean).join(' · ');
 }
 
 function parseLocalDate(value) {

@@ -7,6 +7,7 @@ export function createUiSlice(set, get) {
     selectedCategoryId: null,
     selectedDependencyId: null,
     selectedExternalDependencyId: null,
+    hoveredExternalDependencyId: null,
     selectedWeekIndex: null,
     activePanel: 'task',
     isShiftTaskOpen: false,
@@ -105,6 +106,7 @@ export function createUiSlice(set, get) {
     closeShiftTask: () => set({ isShiftTaskOpen: false }),
     closeSidebar: () => set({ isSidebarOpen: false }),
     setShowEffectiveAllocations: (showEffectiveAllocations) => set({ showEffectiveAllocations }),
+    setHoveredExternalDependency: (dependencyId) => set({ hoveredExternalDependencyId: dependencyId }),
     deleteTaskWithGuard: (taskId) => {
       const document = get().getActiveDocument();
       const week = findPastWeekForTask(document, taskId);
