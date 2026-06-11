@@ -18,6 +18,10 @@ export function createVisibleTimelineDocument(document, today = new Date()) {
     ...document,
     weeks,
     sprints,
+    timelineView: {
+      firstVisibleWeekIndex: weeks[0].weekIndex,
+      hiddenBeforeWeeks: (document.weeks ?? []).filter((week) => week.weekIndex < weeks[0].weekIndex),
+    },
   };
 }
 

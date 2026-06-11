@@ -300,7 +300,7 @@ describe('URL-owned app state', () => {
     );
   });
 
-  it('highlights related and hard-dependent tasks while hovering an external dependency', async () => {
+  it('highlights only non-zero cells for related and hard-dependent tasks while hovering an external dependency', async () => {
     render(<App />);
     await screen.findByText('Nothing is sent to a server, all data stays in this computer');
 
@@ -319,15 +319,20 @@ describe('URL-owned app state', () => {
       store.setHoveredExternalDependency(externalDependencyId);
     });
 
-    expect(hasHighlightedTaskRow('Soft related task')).toBe(true);
-    expect(hasHighlightedTaskRow('Hard dependent task')).toBe(true);
+    await waitFor(() => {
+      expect(hasHighlightedTaskCell('Soft related task', '26.01')).toBe(true);
+      expect(hasHighlightedTaskCell('Hard dependent task', '26.03')).toBe(true);
+    });
+    expect(hasHighlightedTaskCell('Soft related task', '26.02')).toBe(false);
+    expect(hasHighlightedTaskRow('Soft related task')).toBe(false);
+    expect(hasHighlightedTaskRow('Hard dependent task')).toBe(false);
 
     act(() => {
       useTimelineStore.getState().setHoveredExternalDependency(null);
     });
 
-    expect(hasHighlightedTaskRow('Soft related task')).toBe(false);
-    expect(hasHighlightedTaskRow('Hard dependent task')).toBe(false);
+    expect(hasHighlightedTaskCell('Soft related task', '26.01')).toBe(false);
+    expect(hasHighlightedTaskCell('Hard dependent task', '26.03')).toBe(false);
   });
 
   it('opens dependency panel with external and internal choices', async () => {
@@ -1244,6 +1249,14 @@ function hasHighlightedTaskRow(taskName) {
   return screen
     .getAllByText(taskName)
     .some((element) => element.closest('[data-external-highlighted="true"]'));
+}
+
+function hasHighlightedTaskCell(taskName, weekLabel) {
+  return (
+    screen
+      .queryByRole('button', { name: `Set ${taskName} resources in ${weekLabel}` })
+      ?.getAttribute('data-external-highlighted') === 'true'
+  );
 }
 
 function resetStore() {

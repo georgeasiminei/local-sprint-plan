@@ -35,6 +35,8 @@ export default function TaskCell({
   const openResourceCellEditor = useTimelineStore((state) => state.openResourceCellEditor);
   const closeResourceCellEditor = useTimelineStore((state) => state.closeResourceCellEditor);
   const isEditing = editingResourceCell?.taskId === taskId && editingResourceCell?.weekIndex === week?.weekIndex;
+  const hasNonZeroAllocation = Number(allocation) > 0;
+  const showExternalHighlight = isExternallyHighlighted && hasNonZeroAllocation;
 
   useEffect(() => () => window.clearTimeout(clickTimerRef.current), []);
 
@@ -126,9 +128,10 @@ export default function TaskCell({
       tabIndex={week && taskId ? 0 : undefined}
       aria-label={week && taskId ? getCellLabel(taskName, week, isEditable && !isLocked) : undefined}
       className={`relative overflow-visible border-b border-r border-slate-200 px-1 text-center text-xs ${
-        isExternallyHighlighted ? 'bg-yellow-50' : ''
-      } ${isSelected ? 'ring-2 ring-inset ring-focus/60' : isExternallyHighlighted ? 'ring-2 ring-inset ring-yellow-300' : ''}`}
+        showExternalHighlight ? 'bg-yellow-50' : ''
+      } ${isSelected ? 'ring-2 ring-inset ring-focus/60' : showExternalHighlight ? 'ring-2 ring-inset ring-yellow-300' : ''}`}
       style={{ height: rowHeight, lineHeight: `${rowHeight}px`, ...(cellColor ? { backgroundColor: cellColor } : {}) }}
+      data-external-highlighted={showExternalHighlight ? 'true' : undefined}
       onClick={(event) => {
         event.stopPropagation();
         if (!isEditable || isLocked) {

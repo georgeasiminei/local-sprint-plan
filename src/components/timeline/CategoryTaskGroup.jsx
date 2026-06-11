@@ -32,7 +32,6 @@ export default function CategoryTaskGroup({
   const rowCount = Math.max(visibleTasks.length, 1);
   const totals = getTaskTotals(tasks);
   const categoryDependencies = getDependenciesForEntity(document, 'category', category.id);
-  const isCategoryHighlighted = tasks.some((task) => highlightedTaskIds.has(task.id));
 
   return (
     <section
@@ -45,7 +44,7 @@ export default function CategoryTaskGroup({
       <div
         className={`sticky left-0 z-[6] overflow-hidden border-r border-line px-2 py-0.5 text-xs font-semibold shadow-[1px_0_0_0_var(--tw-shadow-color)] shadow-line ${
           isSelected ? 'ring-2 ring-focus/60 font-bold' : ''
-        } ${isCategoryHighlighted ? 'ring-2 ring-yellow-400' : ''}`}
+        }`}
         style={{
           gridRow: `1 / span ${rowCount}`,
           backgroundColor: category.color ?? '#f8fafc',
@@ -142,14 +141,13 @@ function TaskGridRow({
       <div
         className={`sticky z-[5] grid grid-cols-[1fr_48px] overflow-hidden border-b border-r border-slate-200 bg-white text-left hover:bg-slate-50 ${
           isSelected ? 'ring-2 ring-focus/40 z-[6]' : ''
-        } ${isExternallyHighlighted ? 'bg-yellow-50 ring-2 ring-yellow-400 z-[6]' : ''}`}
+        }`}
         style={{
           gridColumn: 2,
           gridRow: row,
           left: CATEGORY_COLUMN_WIDTH,
           height: rowHeight,
         }}
-        data-external-highlighted={isExternallyHighlighted ? 'true' : undefined}
         onClick={() => selectTask(task.id)}
       >
         <div className="min-w-0 overflow-hidden px-2">

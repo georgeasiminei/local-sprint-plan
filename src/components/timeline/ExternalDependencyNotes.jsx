@@ -39,8 +39,7 @@ export default function ExternalDependencyNotes({ document, weekColumnWidth }) {
                 className={`app-tooltip !absolute truncate rounded border px-2 py-1.5 text-[11px] shadow-panel transition hover:brightness-95 ${
                   box.className
                 } ${getBoxTextAlignmentClass(box.side)}`}
-                data-tooltip={box.text}
-                title={box.text}
+                data-tooltip={box.tooltip}
                 style={{ top: `${12 + box.stack * 34}px`, width: box.width, ...getBoxPositionStyle(box) }}
                 onMouseEnter={() => setHoveredExternalDependency(box.id)}
                 onMouseLeave={() => setHoveredExternalDependency(null)}
@@ -61,6 +60,7 @@ export default function ExternalDependencyNotes({ document, weekColumnWidth }) {
 function createExternalDependencyNoteMarkers(document, weekColumnWidth) {
   const groups = new Map();
   const weekCount = document.weeks?.length ?? 0;
+  const firstVisibleWeekIndex = document.timelineView?.firstVisibleWeekIndex ?? document.weeks?.[0]?.weekIndex ?? null;
 
   for (const dependency of document.externalDependencies ?? []) {
     const dueWeek = dependency.dueWeek ?? dependency.endWeek ?? dependency.startWeek;
@@ -68,22 +68,31 @@ function createExternalDependencyNoteMarkers(document, weekColumnWidth) {
       continue;
     }
 
-    const items = groups.get(dueWeek) ?? [];
+    const hiddenBeforeView = firstVisibleWeekIndex !== null && dueWeek < firstVisibleWeekIndex;
+    if (hiddenBeforeView && dependency.status === 'yes') {
+      continue;
+    }
+
+    const groupKey = hiddenBeforeView ? `hidden-before-${dueWeek}` : String(dueWeek);
+    const items = groups.get(groupKey) ?? [];
     items.push(dependency);
-    groups.set(dueWeek, items);
+    groups.set(groupKey, items);
   }
 
   const markers = [...groups.entries()]
-    .map(([dueWeek, dependencies]) => {
+    .map(([groupKey, dependencies]) => {
+      const dueWeek = dependencies[0]?.dueWeek ?? dependencies[0]?.endWeek ?? dependencies[0]?.startWeek;
       const weekIndex = document.weeks.findIndex((week) => week.weekIndex === dueWeek);
-      if (weekIndex === -1) {
+      const hiddenBeforeView = String(groupKey).startsWith('hidden-before-');
+      if (weekIndex === -1 && !hiddenBeforeView) {
         return null;
       }
 
-      const lineIndex = weekIndex + 1;
-      const week = document.weeks[weekIndex];
+      const lineIndex = hiddenBeforeView ? 0 : weekIndex + 1;
+      const week = getWeekByIndex(document, dueWeek);
+      const dueWeekLabel = week?.label ?? `week ${dueWeek}`;
       return {
-        key: `external-notes-${dueWeek}`,
+        key: `external-notes-${groupKey}`,
         left: `${lineIndex * weekColumnWidth}px`,
         lineIndex,
         boxes: dependencies.map((dependency) => {
@@ -100,6 +109,7 @@ function createExternalDependencyNoteMarkers(document, weekColumnWidth) {
             width: placement.width,
             stack: 0,
             text: dependency.notes || dependency.name,
+            tooltip: formatExternalDependencyTooltip(dependency, dueWeekLabel),
             className: style.boxClass,
           };
         }),
@@ -199,6 +209,16 @@ function getExternalDependencyTone(dependency, week) {
   }
 
   return isPastWeek(week) ? 'overdue' : 'pending';
+}
+
+function getWeekByIndex(document, weekIndex) {
+  return [...(document.timelineView?.hiddenBeforeWeeks ?? []), ...(document.weeks ?? [])].find(
+    (week) => week.weekIndex === weekIndex,
+  );
+}
+
+function formatExternalDependencyTooltip(dependency, dueWeekLabel) {
+  return `${dependency.notes || dependency.name} · Due ${dueWeekLabel}`;
 }
 
 function getExternalDependencyStyle(tone) {

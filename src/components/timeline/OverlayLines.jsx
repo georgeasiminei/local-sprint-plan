@@ -140,6 +140,7 @@ function formatEndpointLabel(document, endpoint) {
 
 function createExternalDependencyMarkers(document) {
   const groups = new Map();
+  const firstVisibleWeekIndex = document.timelineView?.firstVisibleWeekIndex ?? document.weeks?.[0]?.weekIndex ?? null;
 
   for (const dependency of document.externalDependencies ?? []) {
     const dueWeek = dependency.dueWeek ?? dependency.endWeek ?? dependency.startWeek;
@@ -147,33 +148,43 @@ function createExternalDependencyMarkers(document) {
       continue;
     }
 
-    const items = groups.get(dueWeek) ?? [];
+    const hiddenBeforeView = firstVisibleWeekIndex !== null && dueWeek < firstVisibleWeekIndex;
+    if (hiddenBeforeView && dependency.status === 'yes') {
+      continue;
+    }
+
+    const groupKey = hiddenBeforeView ? 'hidden-before-view' : String(dueWeek);
+    const items = groups.get(groupKey) ?? [];
     items.push(dependency);
-    groups.set(dueWeek, items);
+    groups.set(groupKey, items);
   }
 
   return [...groups.entries()]
-    .map(([dueWeek, dependencies]) => {
+    .map(([groupKey, dependencies]) => {
+      const dueWeek = dependencies[0]?.dueWeek ?? dependencies[0]?.endWeek ?? dependencies[0]?.startWeek;
       const weekIndex = document.weeks.findIndex((week) => week.weekIndex === dueWeek);
-      if (weekIndex === -1) {
+      const hiddenBeforeView = groupKey === 'hidden-before-view';
+      if (weekIndex === -1 && !hiddenBeforeView) {
         return null;
       }
 
-      const week = document.weeks[weekIndex];
-      const mostUrgentTone = getMostUrgentExternalDependencyTone(dependencies, week);
+      const mostUrgentTone = getMostUrgentExternalDependencyTone(document, dependencies);
       return {
-        key: `external-${dueWeek}`,
-        index: weekIndex + 1,
+        key: `external-${groupKey}`,
+        index: hiddenBeforeView ? 0 : weekIndex + 1,
         lineClass: getExternalDependencyStyle(mostUrgentTone).lineClass,
       };
     })
     .filter(Boolean);
 }
 
-function getMostUrgentExternalDependencyTone(dependencies, week) {
+function getMostUrgentExternalDependencyTone(document, dependencies) {
   const priority = { overdue: 0, partial: 1, pending: 2, complete: 3 };
   return dependencies
-    .map((dependency) => getExternalDependencyTone(dependency, week))
+    .map((dependency) => {
+      const dueWeek = dependency.dueWeek ?? dependency.endWeek ?? dependency.startWeek;
+      return getExternalDependencyTone(dependency, getWeekByIndex(document, dueWeek));
+    })
     .sort((left, right) => priority[left] - priority[right])[0] ?? 'pending';
 }
 
@@ -187,6 +198,12 @@ function getExternalDependencyTone(dependency, week) {
   }
 
   return isPastWeek(week) ? 'overdue' : 'pending';
+}
+
+function getWeekByIndex(document, weekIndex) {
+  return [...(document.timelineView?.hiddenBeforeWeeks ?? []), ...(document.weeks ?? [])].find(
+    (week) => week.weekIndex === weekIndex,
+  );
 }
 
 function getExternalDependencyStyle(tone) {
