@@ -244,9 +244,13 @@ function TaskGridRow({
 }
 
 function getTaskCellStatusColor(task, week, hasAllocatedUnits = false) {
+  if (!hasAllocatedUnits) {
+    return null;
+  }
+
   const status = getTaskStatusValue(task);
 
-  if (status === TASK_STATUS_COMPLETED && hasAllocatedUnits) {
+  if (status === TASK_STATUS_COMPLETED) {
     return TASK_STATUS_COLORS[TASK_STATUS_COMPLETED];
   }
 

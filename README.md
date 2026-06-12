@@ -50,7 +50,7 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 - On wide screens, the planner uses the full browser width before the week grid needs horizontal scrolling.
 - Categories render as merged cells spanning their task rows to keep the table vertically compact.
 - Task/category colors appear only on weeks where the task has allocated resources.
-- Task status can color timeline cells: Green colors past cells green, Amber colors the current week bright yellow, Red colors the current week bright red, and Completed colors only non-zero task cells green while freezing history.
+- Task status can color timeline cells, but empty cells stay uncolored. Green colors past non-zero cells green, Amber colors the current non-zero week bright yellow, Red colors the current non-zero week bright red, and Completed colors only non-zero task cells green while freezing history.
 - Today is shown as a thin blue line positioned within the current week, while external dependency deadline lines keep their status colors on week borders.
 - External dependencies are thin full-height deadline lines; their editable text boxes sit in a dependency lane below the table, and due weeks use planning labels such as `26.12`.
 - External dependency colors are status and date aware: incomplete past-due markers are red, incomplete future markers are dark grey, partial markers are yellow, and completed markers are green.

@@ -39,7 +39,7 @@ Build and maintain a live local-only React planning app whose single active plan
 - The timeline uses frozen category/task columns and compact task rows; category cells span their visible task rows like merged spreadsheet cells.
 - Tasks created from a selected category inherit category and color.
 - `Task`, `Category`, and `Dependency` open focused right-side panels with close and delete controls. New task/category starter names are selected immediately for overwrite. Dependency creation supports external deadline markers and internal dependencies from task, category, or external dependency predecessors to task/category successors.
-- The task panel exposes a status dropdown. None keeps normal cell colors, Green colors past cells green, Amber colors the current week yellow, Red colors the current week red, and Completed freezes history while coloring only non-zero task cells green.
+- The task panel exposes a status dropdown. Empty task cells stay uncolored for every status. None keeps normal cell colors, Green colors past non-zero cells green, Amber colors the current non-zero week yellow, Red colors the current non-zero week red, and Completed freezes history while coloring only non-zero task cells green.
 - Numeric entry uses plain edit boxes rather than browser steppers.
 - Estimates and resource values are normalized to one decimal place.
 - The timeline has a checkbox to switch between editable resource allocation view and read-only effective resource view. The total effort row shows effective allocation/raw week capacity.
