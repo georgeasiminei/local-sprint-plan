@@ -515,12 +515,15 @@ describe('URL-owned app state', () => {
     expect(useTimelineStore.getState().getActiveDocument().tasks[0].completed).toBe(true);
   });
 
-  it('colors past task cells green without requiring allocation', async () => {
+  it('colors only non-empty past task cells green', async () => {
     const user = userEvent.setup();
+    const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+    const startYear = weekNumber > 2 ? weekYear : weekYear - 1;
+    const startWeek = weekNumber > 2 ? weekNumber - 2 : 52 + weekNumber - 2;
     const payload = await encodePlanToHashPayload(
       createPlanFixture({
-        plan: { startYear: 2020, startWeek: 1, startingResourceCount: 1 },
-        tasks: [{ id: 'task-1', name: 'Past health task', priority: 1, estimateWeeks: 0 }],
+        plan: { startYear, startWeek, startingResourceCount: 1 },
+        tasks: [{ id: 'task-1', name: 'Past health task', priority: 1, estimateWeeks: 1 }],
       }),
     );
     window.history.replaceState(null, '', `/#${payload}`);
@@ -530,13 +533,18 @@ describe('URL-owned app state', () => {
 
     const document = useTimelineStore.getState().getActiveDocument();
     const pastWeek = document.weeks[0];
+    const emptyPastWeek = document.weeks[1];
     const pastCell = await screen.findByRole('button', {
       name: `Set Past health task resources in ${pastWeek.label}`,
+    });
+    const emptyPastCell = await screen.findByRole('button', {
+      name: `Set Past health task resources in ${emptyPastWeek.label}`,
     });
 
     await user.selectOptions(await screen.findByRole('combobox', { name: /Status/i }), 'green');
 
     expect(pastCell).toHaveStyle({ backgroundColor: TASK_STATUS_COLORS.green });
+    expect(emptyPastCell).not.toHaveStyle({ backgroundColor: TASK_STATUS_COLORS.green });
     expect(useTimelineStore.getState().getActiveDocument().tasks[0]).toMatchObject({ status: 'green' });
   });
 
