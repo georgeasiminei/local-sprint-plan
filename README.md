@@ -29,7 +29,7 @@ The URL hash is the active saved state. Manual `Save` and `Load` actions keep na
 
 The hash stores a compact source-only document and the app regenerates planning weeks, sprints, and computed schedule rows in memory.
 
-Task cell edits are saved as compact resource rules: setting a task to `x` resources in a week applies `x` from that week onward until another rule is added. The grid marks both the week where a rule starts and later weeks where that rule is inherited.
+Task cell edits are saved as compact resource rules: setting a task to `x` resources in a week applies `x` from that week onward until another rule is added.
 Task health status is saved only when set to Green, Amber, or Red; None stays omitted from the compact URL.
 Completed historical tasks store only compact frozen resource intervals, so old schedule history stays stable without bloating the URL.
 

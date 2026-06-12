@@ -539,6 +539,31 @@ describe('recalculateSchedule', () => {
     ]);
   });
 
+  it('fills a higher-priority capped task to its max before lower-priority work uses leftover capacity', () => {
+    const document = createPlanDocument({ startWeek: 1, startingResourceCount: 5 });
+    document.tasks = [
+      { id: 'task-1', name: 'Higher-priority capped task', priority: 15, estimateWeeks: 40, maxResources: 4 },
+      { id: 'task-2', name: 'Lower-priority uncapped task', priority: 18, estimateWeeks: 7.5, maxResources: null },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule.slice(0, 12)).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 4, isManual: false },
+      { taskId: 'task-1', weekIndex: 2, allocatedUnits: 4, isManual: false },
+      { taskId: 'task-1', weekIndex: 3, allocatedUnits: 4, isManual: false },
+      { taskId: 'task-1', weekIndex: 4, allocatedUnits: 4, isManual: false },
+      { taskId: 'task-1', weekIndex: 5, allocatedUnits: 4, isManual: false },
+      { taskId: 'task-1', weekIndex: 6, allocatedUnits: 4, isManual: false },
+      { taskId: 'task-1', weekIndex: 7, allocatedUnits: 4, isManual: false },
+      { taskId: 'task-1', weekIndex: 8, allocatedUnits: 4, isManual: false },
+      { taskId: 'task-1', weekIndex: 9, allocatedUnits: 4, isManual: false },
+      { taskId: 'task-1', weekIndex: 10, allocatedUnits: 4, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 1, isManual: false },
+      { taskId: 'task-2', weekIndex: 2, allocatedUnits: 1, isManual: false },
+    ]);
+  });
+
   it('keeps extending the timeline until long delayed tasks are fully scheduled', () => {
     const document = createPlanDocument({ startWeek: 16, startingResourceCount: 5 });
     document.tasks = [

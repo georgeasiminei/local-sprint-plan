@@ -208,7 +208,7 @@ function TaskGridRow({
         {weeks.length > 0 ? (
           weeks.map((week) => {
             const entry = taskSchedule.find((item) => item.weekIndex === week.weekIndex);
-            const resourceRule = getActiveResourceRule(task, week.weekIndex);
+            const isOverride = (task.resourceOverrides ?? []).some((override) => override.weekIndex === week.weekIndex);
             const allocation = allocationView === 'effective'
               ? getEffectiveAllocationForEntry(entry)
               : getResourceAllocationForEntry(document, task, week, entry);
@@ -225,7 +225,7 @@ function TaskGridRow({
                 week={week}
                 allocation={allocation}
                 isManual={entry?.isManual}
-                resourceRule={resourceRule}
+                isOverride={isOverride}
                 isLocked={task.completed || allocationView === 'effective'}
                 isEditable={allocationView === 'resource'}
                 isSelected={isSelectedWeek}
@@ -241,22 +241,6 @@ function TaskGridRow({
       </div>
     </>
   );
-}
-
-function getActiveResourceRule(task, weekIndex) {
-  const override = [...(task.resourceOverrides ?? [])]
-    .filter((item) => item.weekIndex <= weekIndex)
-    .sort((a, b) => b.weekIndex - a.weekIndex)[0];
-
-  if (!override) {
-    return null;
-  }
-
-  return {
-    allocatedUnits: override.allocatedUnits,
-    startsHere: override.weekIndex === weekIndex,
-    weekIndex: override.weekIndex,
-  };
 }
 
 function getTaskCellStatusColor(task, week, hasAllocatedUnits = false) {
