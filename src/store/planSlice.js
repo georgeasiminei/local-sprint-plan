@@ -265,7 +265,7 @@ export function createPlanSlice(set, get) {
 }
 
 function setVacationDays(vacations = [], weekIndex, dayCount) {
-  const normalizedDayCount = Math.max(0, Math.floor(Number(dayCount) || 0));
+  const normalizedDayCount = parseNonNegativeTenths(dayCount);
   const retained = vacations.filter((vacation) => vacation.weekIndex !== weekIndex);
 
   if (normalizedDayCount === 0) {

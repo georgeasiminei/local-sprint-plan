@@ -8,6 +8,14 @@ import Input from '../ui/Input.jsx';
 import Select from '../ui/Select.jsx';
 import { getDependenciesForEntity, getDependencyEndpoint, getDependencyEntityName } from '../../utils/dependencies.js';
 import { isTaskCompletionAvailable } from '../../engine/taskCompletion.js';
+import {
+  getTaskStatusValue,
+  TASK_STATUS_AMBER,
+  TASK_STATUS_COMPLETED,
+  TASK_STATUS_GREEN,
+  TASK_STATUS_NONE,
+  TASK_STATUS_RED,
+} from '../../engine/taskStatus.js';
 
 export default function TaskDetailPanel({ document }) {
   const selectedTaskId = useTimelineStore((state) => state.selectedTaskId);
@@ -15,7 +23,7 @@ export default function TaskDetailPanel({ document }) {
   const closeSidebar = useTimelineStore((state) => state.closeSidebar);
   const deleteTaskWithGuard = useTimelineStore((state) => state.deleteTaskWithGuard);
   const moveTask = useTimelineStore((state) => state.moveTask);
-  const setTaskCompleted = useTimelineStore((state) => state.setTaskCompleted);
+  const setTaskStatus = useTimelineStore((state) => state.setTaskStatus);
   const selectDependency = useTimelineStore((state) => state.selectDependency);
   const task = useMemo(
     () => document.tasks.find((item) => item.id === selectedTaskId) ?? document.tasks[0],
@@ -158,22 +166,26 @@ export default function TaskDetailPanel({ document }) {
           />
         </label>
 
-        {canCompleteTask || task.completed ? (
-          <label className="flex items-start gap-2 rounded border border-line p-3 text-sm">
-            <input
-              className="mt-0.5"
-              type="checkbox"
-              checked={Boolean(task.completed)}
-              onChange={(event) => setTaskCompleted(task.id, event.target.checked)}
-            />
-            <span>
-              <span className="block font-medium">Completed</span>
-              <span className="block text-xs text-slate-500">
-                Freeze this task&apos;s actual resource history once it is in its final week or already in the past.
-              </span>
-            </span>
-          </label>
-        ) : null}
+        <label className="block text-sm font-medium">
+          Status
+          <Select
+            className="mt-1 w-full"
+            value={getTaskStatusValue(task)}
+            aria-describedby="task-status-help"
+            onChange={(event) => setTaskStatus(task.id, event.target.value)}
+          >
+            <option value={TASK_STATUS_NONE}>None</option>
+            <option value={TASK_STATUS_GREEN}>Green (on track)</option>
+            <option value={TASK_STATUS_AMBER}>Amber (risk of delay)</option>
+            <option value={TASK_STATUS_RED}>Red (requires attention)</option>
+            <option value={TASK_STATUS_COMPLETED} disabled={!canCompleteTask && !task.completed}>
+              Completed
+            </option>
+          </Select>
+          <span id="task-status-help" className="mt-1 block text-xs text-slate-500">
+            Completed freezes this task&apos;s actual resource history once it is in its final week or already in the past.
+          </span>
+        </label>
 
         {task.completed ? (
           <p className="text-xs text-slate-500">

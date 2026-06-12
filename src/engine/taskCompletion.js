@@ -101,8 +101,9 @@ export function freezeTaskFromSchedule(task, schedule = []) {
     return task;
   }
 
+  const { status, ...rest } = task;
   return {
-    ...task,
+    ...rest,
     completed: true,
     completedIntervals,
   };

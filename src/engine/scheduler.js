@@ -140,7 +140,7 @@ export function recalculateSchedule(document) {
       );
     }
 
-    if (result.entries.length > 0) {
+    if (result.remainingEstimate <= 0 && result.entries.length > 0) {
       completionWeekByTask.set(task.id, result.entries[result.entries.length - 1].weekIndex);
     }
 
@@ -242,6 +242,17 @@ function scheduleTask(options) {
         isManual: false,
       });
       state.remainingEstimate = roundAllocation(state.remainingEstimate - allocation);
+    } else {
+      const rawAllocatedUnits = getRawAllocationForFullyVacationedTask(taskCapacity, capacity.taskVacationResourceLoss);
+      if (rawAllocatedUnits > 0) {
+        state.entries.push({
+          taskId: options.task.id,
+          weekIndex: week.weekIndex,
+          allocatedUnits: 0,
+          rawAllocatedUnits,
+          isManual: false,
+        });
+      }
     }
 
     if (state.remainingEstimate <= 0) {
@@ -377,6 +388,14 @@ function getTaskRawResourceCap(task, weekIndex, rawAvailable = Number.POSITIVE_I
   }
 
   return Math.min(...rawLimits);
+}
+
+function getRawAllocationForFullyVacationedTask(taskCapacity, taskVacationResourceLoss = 0) {
+  if (taskVacationResourceLoss <= 0 || taskCapacity.effectiveFromRawCap > 0) {
+    return 0;
+  }
+
+  return roundAllocation(Math.max(0, taskCapacity.rawResourceCap ?? 0));
 }
 
 function getRawAllocationForScheduledEntry({

@@ -10,6 +10,7 @@ import {
 } from '../constants/defaults.js';
 import { SCHEMA_VERSION } from '../constants/schemaVersion.js';
 import { buildCalculatedWeeks, buildFixedSprints } from '../engine/timeline.js';
+import { normalizeTaskHealthStatus } from '../engine/taskStatus.js';
 
 export const SHARE_URL_MAX_PAYLOAD_LENGTH = 100_000;
 
@@ -17,6 +18,8 @@ const DEFAULT_FREE_DAY_REASON = 'Week capacity adjustment';
 const COLOR_PALETTE = DEFAULT_CATEGORY_COLORS;
 const STATUS_TO_CODE = { partial: 1, yes: 2 };
 const CODE_TO_STATUS = ['no', 'partial', 'yes'];
+const TASK_STATUS_TO_CODE = { green: 1, amber: 2, red: 3 };
+const CODE_TO_TASK_STATUS = [null, 'green', 'amber', 'red'];
 
 export async function encodePlanToHashPayload(planDocument, options = {}) {
   const maxPayloadLength = options.maxPayloadLength ?? SHARE_URL_MAX_PAYLOAD_LENGTH;
@@ -87,6 +90,7 @@ export function compactPlanDocument(document) {
         compactCompletedIntervals(task.completedIntervals),
         compactRows(task.vacations, (vacation) => [vacation.weekIndex, vacation.dayCount]),
         compactShiftRules(task.shiftRules),
+        TASK_STATUS_TO_CODE[normalizeTaskHealthStatus(task.status)] ?? null,
       ]),
     ),
     compactRows(document.dependencies, (dependency) =>
@@ -179,6 +183,7 @@ export function expandCompactPlanDocument(compactDocument) {
       })),
       vacations: expandWeekValuePairs(task[10]).map(({ weekIndex, value }) => ({ weekIndex, dayCount: value })),
       shiftRules: expandShiftRules(task[11]),
+      ...(CODE_TO_TASK_STATUS[task[12]] ? { status: CODE_TO_TASK_STATUS[task[12]] } : {}),
       ...(completedIntervals.length > 0
         ? {
             completed: true,

@@ -1,4 +1,4 @@
-import { getResourceAllocationForEntry } from '../../engine/allocationDisplay.js';
+import { resolveWeekResourceCount } from '../../engine/resourceResolver.js';
 import { useTimelineStore } from '../../store/index.js';
 import { formatNumber } from '../../utils/format.js';
 import { CATEGORY_COLUMN_WIDTH, TASK_COLUMN_WIDTH, weekGridColumns } from './layout.js';
@@ -7,19 +7,13 @@ import { formatWeekTooltip } from './weekTooltip.js';
 export default function EffortSummaryRow({ document, rowHeight, weekColumnWidth }) {
   const selectWeek = useTimelineStore((state) => state.selectWeek);
   const effectiveAllocationByWeek = new Map();
-  const resourceAllocationByWeek = new Map();
+  const firstTeam = document.teams?.[0];
+  const startingResourceCount = document.plan?.startingResourceCount ?? document.weekResources?.[0]?.resourceCount ?? 0;
 
   for (const entry of document.schedule ?? []) {
-    const week = document.weeks.find((item) => item.weekIndex === entry.weekIndex);
-    const task = document.tasks.find((item) => item.id === entry.taskId);
-    const resourceAllocation = getResourceAllocationForEntry(document, task, week, entry) ?? 0;
     effectiveAllocationByWeek.set(
       entry.weekIndex,
       (effectiveAllocationByWeek.get(entry.weekIndex) ?? 0) + (entry.allocatedUnits ?? 0),
-    );
-    resourceAllocationByWeek.set(
-      entry.weekIndex,
-      (resourceAllocationByWeek.get(entry.weekIndex) ?? 0) + resourceAllocation,
     );
   }
 
@@ -38,7 +32,9 @@ export default function EffortSummaryRow({ document, rowHeight, weekColumnWidth 
       <div className="grid col-start-3" style={{ gridTemplateColumns: weekGridColumns(document.weeks.length, weekColumnWidth) }}>
         {document.weeks.map((week) => {
           const effectiveAssigned = effectiveAllocationByWeek.get(week.weekIndex) ?? 0;
-          const resourceAssigned = resourceAllocationByWeek.get(week.weekIndex) ?? 0;
+          const resourceCapacity = firstTeam
+            ? resolveWeekResourceCount(week.weekIndex, firstTeam.id, document.weekResources ?? [], startingResourceCount)
+            : 0;
           const tooltip = formatWeekTooltip(week);
 
           return (
@@ -62,7 +58,7 @@ export default function EffortSummaryRow({ document, rowHeight, weekColumnWidth 
               }}
             >
               <span>
-                {formatNumber(effectiveAssigned)}/{formatNumber(resourceAssigned)}
+                {formatNumber(effectiveAssigned)}/{formatNumber(resourceCapacity)}
               </span>
             </div>
           );
