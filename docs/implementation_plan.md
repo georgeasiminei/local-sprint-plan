@@ -43,7 +43,7 @@ Build and maintain a live local-only React planning app whose single active plan
 - The task panel exposes a status dropdown. Empty task cells stay uncolored for every status. None keeps normal cell colors, Green colors past non-zero cells green, Amber colors the current non-zero week yellow, Red colors the current non-zero week red, and Completed freezes history while coloring only non-zero task cells green. Non-zero is based on the value shown in the active allocation view.
 - Numeric entry uses plain edit boxes rather than browser steppers.
 - Estimates and resource values are normalized to one decimal place.
-- The timeline has a checkbox to switch between editable resource allocation view and read-only effective resource view. The total effort row shows effective allocation/raw week capacity.
+- The timeline has a checkbox to switch between editable resource allocation view and read-only effective resource view. The total effort row follows the active view for assigned resources and always shows the resolved raw week capacity as the denominator.
 - Computed schedule rows carry effective allocation plus raw allocation when those differ, so resource allocation cells stay stable even when effective allocations are rounded. Completed task intervals preserve the same raw/effective distinction and continue to respect the view toggle.
 - Task and category side panel headers expose discreet up/down icon controls for reordering the timeline list without cluttering the grid.
 - Selecting a task, category, or dependency and pressing Delete removes it, with past-week confirmation when historical schedule/deadline data is affected.

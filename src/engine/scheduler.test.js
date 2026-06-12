@@ -420,6 +420,60 @@ describe('recalculateSchedule', () => {
     ]);
   });
 
+  it('keeps inherited resource override raw values stable when earlier rounded allocations leave extra raw capacity', () => {
+    const document = createPlanDocument({
+      name: 'Rounded inherited resource rule fixture',
+      startWeek: 1,
+      startingResourceCount: 13,
+    });
+    document.plan.vacations = [{ weekIndex: 1, dayCount: 7 }];
+    document.tasks = [
+      { id: 'manual-task', categoryId: null, name: 'Manual reservation', priority: 1, estimateWeeks: 1.8 },
+      {
+        id: 'completed-task',
+        categoryId: null,
+        name: 'Completed reservation',
+        priority: 2,
+        estimateWeeks: 4,
+        completed: true,
+        completedIntervals: [{ startWeek: 1, endWeek: 1, allocatedUnits: 3.6, rawAllocatedUnits: 4 }],
+      },
+      {
+        id: 'first-capped-task',
+        categoryId: null,
+        name: 'First inherited rule task',
+        priority: 3,
+        estimateWeeks: 3.1,
+        resourceOverrides: [{ weekIndex: 1, allocatedUnits: 3.5 }],
+      },
+      {
+        id: 'second-capped-task',
+        categoryId: null,
+        name: 'Second inherited rule task',
+        priority: 4,
+        estimateWeeks: 3.1,
+        resourceOverrides: [{ weekIndex: 1, allocatedUnits: 3.5 }],
+      },
+    ];
+    document.schedule = [{ taskId: 'manual-task', weekIndex: 1, allocatedUnits: 1.8, isManual: true }];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
+      { taskId: 'manual-task', weekIndex: 1, allocatedUnits: 1.8, isManual: true },
+      {
+        taskId: 'completed-task',
+        weekIndex: 1,
+        allocatedUnits: 3.6,
+        rawAllocatedUnits: 4,
+        isManual: false,
+        isCompleted: true,
+      },
+      { taskId: 'first-capped-task', weekIndex: 1, allocatedUnits: 3.1, rawAllocatedUnits: 3.5, isManual: false },
+      { taskId: 'second-capped-task', weekIndex: 1, allocatedUnits: 3.1, rawAllocatedUnits: 3.5, isManual: false },
+    ]);
+  });
+
   it('extends visible weeks for external dependency markers', () => {
     const document = createPlanDocument({ startWeek: 1, startingResourceCount: 5 });
     document.externalDependencies = [{ id: 'x1', name: 'Vendor input', dueWeek: 14, status: 'no' }];

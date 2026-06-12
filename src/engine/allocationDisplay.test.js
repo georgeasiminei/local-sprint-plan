@@ -87,4 +87,20 @@ describe('allocation display values', () => {
       }),
     ).toBe(3);
   });
+
+  it('uses stored manual allocation when old manual rows do not have raw allocation', () => {
+    const document = createPlanDocument({ startWeek: 1, startingResourceCount: 4 });
+    const week = document.weeks[0];
+    document.plan.vacations = [{ weekIndex: week.weekIndex, dayCount: 5 }];
+    document.tasks = [{ id: 'task-1', name: 'Manual task', priority: 1, estimateWeeks: 10 }];
+
+    expect(
+      getResourceAllocationForEntry(document, document.tasks[0], week, {
+        taskId: 'task-1',
+        weekIndex: week.weekIndex,
+        allocatedUnits: 1.7,
+        isManual: true,
+      }),
+    ).toBe(1.7);
+  });
 });
