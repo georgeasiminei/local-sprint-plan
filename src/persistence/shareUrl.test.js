@@ -302,7 +302,7 @@ describe('URL plan payloads', () => {
           name: 'Task with vacation',
           priority: 1,
           estimateWeeks: 4,
-          vacations: [{ weekIndex: 3, dayCount: 2 }],
+          vacations: [{ weekIndex: 3, dayCount: 2.5 }],
         },
       ],
     });
@@ -310,8 +310,29 @@ describe('URL plan payloads', () => {
     const compact = compactPlanDocument(document);
     const decoded = await decodePlanFromHashPayload(await encodePlanToHashPayload(document));
 
-    expect(compact[2][0][10]).toEqual([[3, 2]]);
-    expect(decoded.tasks[0].vacations).toEqual([{ weekIndex: 3, dayCount: 2 }]);
+    expect(compact[2][0][10]).toEqual([[3, 2.5]]);
+    expect(decoded.tasks[0].vacations).toEqual([{ weekIndex: 3, dayCount: 2.5 }]);
+  });
+
+  it('round trips task health status in compact URL state', async () => {
+    const document = createPlanFixture({
+      tasks: [
+        {
+          id: 'task-1',
+          name: 'Tracked task',
+          priority: 1,
+          estimateWeeks: 4,
+          status: 'amber',
+        },
+      ],
+    });
+
+    const compact = compactPlanDocument(document);
+    const decoded = await decodePlanFromHashPayload(await encodePlanToHashPayload(document));
+
+    expect(compact[2][0][12]).toBe(2);
+    expect(decoded.tasks[0]).toMatchObject({ status: 'amber' });
+    expect(validatePlanDocument(decoded).valid).toBe(true);
   });
 
   it('round trips reversible task shift rules in compact URL state', async () => {

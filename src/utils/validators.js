@@ -183,6 +183,10 @@ function validateTasks(tasks, categoryIds, errors) {
       errors.push(`Task ${task.id} completed must be a boolean.`);
     }
 
+    if (task.status !== undefined && !['green', 'amber', 'red'].includes(task.status)) {
+      errors.push(`Task ${task.id} status must be green, amber, or red.`);
+    }
+
     for (const interval of task.completedIntervals ?? []) {
       if (!isIntegerAtLeast(interval.startWeek, 1)) {
         errors.push(`Task ${task.id} completed interval startWeek must be a positive integer.`);

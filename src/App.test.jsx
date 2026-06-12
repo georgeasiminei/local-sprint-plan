@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import App from './App.jsx';
 import { resolveWeekResourceCount } from './engine/resourceResolver.js';
 import { getCurrentIsoWeekInfo } from './engine/timeline.js';
+import { TASK_STATUS_COLORS } from './engine/taskStatus.js';
 import { useTimelineStore } from './store/index.js';
 import { createPlanFixture } from './test/fixtures/planDocument.js';
 import { decodePlanFromHashPayload, encodePlanToHashPayload } from './persistence/shareUrl.js';
@@ -435,8 +436,7 @@ describe('URL-owned app state', () => {
 
     render(<App />);
     await user.click(await screen.findByText('Finishing task'));
-    const checkbox = await screen.findByRole('checkbox', { name: /Completed/i });
-    await user.click(checkbox);
+    await user.selectOptions(await screen.findByRole('combobox', { name: /Status/i }), 'completed');
 
     await waitFor(() => {
       const task = useTimelineStore.getState().getActiveDocument().tasks[0];
@@ -471,6 +471,73 @@ describe('URL-owned app state', () => {
     const taskLabel = await screen.findByText('Frozen task');
     expect(taskLabel).toHaveClass('italic');
     expect(screen.getByRole('img', { name: 'Frozen task completed' })).toBeInTheDocument();
+
+    const document = useTimelineStore.getState().getActiveDocument();
+    const completedCell = await screen.findByRole('button', {
+      name: `View Frozen task effective resources in ${document.weeks[0].label}`,
+    });
+    const emptyCell = await screen.findByRole('button', {
+      name: `View Frozen task effective resources in ${document.weeks[1].label}`,
+    });
+    expect(completedCell).toHaveStyle({ backgroundColor: TASK_STATUS_COLORS.completed });
+    expect(emptyCell).not.toHaveStyle({ backgroundColor: TASK_STATUS_COLORS.completed });
+  });
+
+  it('colors task cells from the task status dropdown', async () => {
+    const user = userEvent.setup();
+    const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { startYear: weekYear, startWeek: weekNumber, startingResourceCount: 1 },
+        tasks: [{ id: 'task-1', name: 'Watched task', priority: 1, estimateWeeks: 1 }],
+      }),
+    );
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+    await user.click(await screen.findByText('Watched task'));
+
+    const document = useTimelineStore.getState().getActiveDocument();
+    const currentWeek = document.weeks[0];
+    const currentCell = await screen.findByRole('button', {
+      name: `Set Watched task resources in ${currentWeek.label}`,
+    });
+    const statusSelect = await screen.findByRole('combobox', { name: /Status/i });
+
+    await user.selectOptions(statusSelect, 'amber');
+    expect(currentCell).toHaveStyle({ backgroundColor: TASK_STATUS_COLORS.amber });
+
+    await user.selectOptions(statusSelect, 'red');
+    expect(currentCell).toHaveStyle({ backgroundColor: TASK_STATUS_COLORS.red });
+
+    await user.selectOptions(statusSelect, 'completed');
+    expect(currentCell).toHaveStyle({ backgroundColor: TASK_STATUS_COLORS.completed });
+    expect(useTimelineStore.getState().getActiveDocument().tasks[0].completed).toBe(true);
+  });
+
+  it('colors past task cells green without requiring allocation', async () => {
+    const user = userEvent.setup();
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { startYear: 2020, startWeek: 1, startingResourceCount: 1 },
+        tasks: [{ id: 'task-1', name: 'Past health task', priority: 1, estimateWeeks: 0 }],
+      }),
+    );
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+    await user.click(await screen.findByText('Past health task'));
+
+    const document = useTimelineStore.getState().getActiveDocument();
+    const pastWeek = document.weeks[0];
+    const pastCell = await screen.findByRole('button', {
+      name: `Set Past health task resources in ${pastWeek.label}`,
+    });
+
+    await user.selectOptions(await screen.findByRole('combobox', { name: /Status/i }), 'green');
+
+    expect(pastCell).toHaveStyle({ backgroundColor: TASK_STATUS_COLORS.green });
+    expect(useTimelineStore.getState().getActiveDocument().tasks[0]).toMatchObject({ status: 'green' });
   });
 
   it('auto-completes tasks older than three weeks on load', async () => {
@@ -700,16 +767,17 @@ describe('URL-owned app state', () => {
     await user.selectOptions(await screen.findByLabelText(`New vacation scope for ${firstWeek.label}`), `category:${category.id}`);
     await user.click(screen.getByRole('button', { name: `Add vacation scope for ${firstWeek.label}` }));
     const vacationInput = await screen.findByLabelText(`Vacation days for Category: ${category.name} in ${firstWeek.label}`);
-    fireEvent.change(vacationInput, { target: { value: '5' } });
+    fireEvent.change(vacationInput, { target: { value: '2.5' } });
     fireEvent.blur(vacationInput);
 
     await waitFor(() => {
       const nextDocument = useTimelineStore.getState().getActiveDocument();
       const taskId = nextDocument.tasks[0].id;
       const weekIndex = nextDocument.weeks[0].weekIndex;
+      expect(nextDocument.categories[0].vacations).toEqual([{ weekIndex, dayCount: 2.5 }]);
       expect(nextDocument.schedule).toEqual([
-        expect.objectContaining({ taskId, weekIndex, allocatedUnits: 3 }),
-        expect.objectContaining({ taskId, weekIndex: weekIndex + 1, allocatedUnits: 1 }),
+        expect.objectContaining({ taskId, weekIndex, allocatedUnits: 3.5 }),
+        expect.objectContaining({ taskId, weekIndex: weekIndex + 1, allocatedUnits: 0.5 }),
       ]);
     });
   });
@@ -744,14 +812,14 @@ describe('URL-owned app state', () => {
     await user.selectOptions(await screen.findByLabelText(`New vacation scope for ${firstWeek.label}`), `task:${task.id}`);
     await user.click(screen.getByRole('button', { name: `Add vacation scope for ${firstWeek.label}` }));
     const vacationInput = await screen.findByLabelText(`Vacation days for Task: ${task.name} in ${firstWeek.label}`);
-    fireEvent.change(vacationInput, { target: { value: '5' } });
+    fireEvent.change(vacationInput, { target: { value: '2.5' } });
     fireEvent.blur(vacationInput);
 
     await waitFor(() => {
       const nextDocument = useTimelineStore.getState().getActiveDocument();
-      expect(nextDocument.tasks[0].vacations).toEqual([{ weekIndex: firstWeek.weekIndex, dayCount: 5 }]);
+      expect(nextDocument.tasks[0].vacations).toEqual([{ weekIndex: firstWeek.weekIndex, dayCount: 2.5 }]);
       expect(nextDocument.schedule.filter((entry) => entry.weekIndex === firstWeek.weekIndex)).toEqual([
-        expect.objectContaining({ taskId: nextDocument.tasks[0].id, allocatedUnits: 1 }),
+        expect.objectContaining({ taskId: nextDocument.tasks[0].id, allocatedUnits: 1.5 }),
         expect.objectContaining({ taskId: nextDocument.tasks[1].id, allocatedUnits: 3 }),
       ]);
     });
@@ -963,14 +1031,14 @@ describe('URL-owned app state', () => {
 
     await user.click(screen.getByRole('button', { name: `Add vacation scope for ${firstWeek.label}` }));
     const planVacationInput = await screen.findByLabelText(`Vacation days for Entire plan in ${firstWeek.label}`);
-    fireEvent.change(planVacationInput, { target: { value: '10' } });
+    fireEvent.change(planVacationInput, { target: { value: '2.5' } });
     fireEvent.blur(planVacationInput);
 
     await waitFor(() => {
       const nextDocument = useTimelineStore.getState().getActiveDocument();
-      expect(nextDocument.plan.vacations).toEqual([{ weekIndex: firstWeek.weekIndex, dayCount: 10 }]);
+      expect(nextDocument.plan.vacations).toEqual([{ weekIndex: firstWeek.weekIndex, dayCount: 2.5 }]);
       expect(nextDocument.schedule[0]).toEqual(
-        expect.objectContaining({ weekIndex: firstWeek.weekIndex, allocatedUnits: 1.2 }),
+        expect.objectContaining({ weekIndex: firstWeek.weekIndex, allocatedUnits: 2.7 }),
       );
     });
   });

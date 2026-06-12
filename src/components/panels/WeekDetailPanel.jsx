@@ -175,7 +175,7 @@ export default function WeekDetailPanel({ document }) {
                     className="w-full px-2 text-center"
                     value={entry.dayCount}
                     aria-label={`Vacation days for ${entry.label} in ${week.label}`}
-                    inputMode="numeric"
+                    inputMode="decimal"
                     onCommit={(value) => updateVacationDays(entry.scope, value)}
                     as={DeferredNumberInput}
                   />

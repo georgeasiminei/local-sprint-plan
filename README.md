@@ -30,6 +30,7 @@ The URL hash is the active saved state. Manual `Save` and `Load` actions keep na
 The hash stores a compact source-only document and the app regenerates planning weeks, sprints, and computed schedule rows in memory.
 
 Task cell edits are saved as compact resource rules: setting a task to `x` resources in a week applies `x` from that week onward until another rule is added.
+Task health status is saved only when set to Green, Amber, or Red; None stays omitted from the compact URL.
 Completed historical tasks store only compact frozen resource intervals, so old schedule history stays stable without bloating the URL.
 
 ## Export
@@ -49,6 +50,7 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 - On wide screens, the planner uses the full browser width before the week grid needs horizontal scrolling.
 - Categories render as merged cells spanning their task rows to keep the table vertically compact.
 - Task/category colors appear only on weeks where the task has allocated resources.
+- Task status can color timeline cells: Green colors past cells green, Amber colors the current week bright yellow, Red colors the current week bright red, and Completed colors only non-zero task cells green while freezing history.
 - Today is shown as a thin blue line positioned within the current week, while external dependency deadline lines keep their status colors on week borders.
 - External dependencies are thin full-height deadline lines; their editable text boxes sit in a dependency lane below the table, and due weeks use planning labels such as `26.12`.
 - External dependency colors are status and date aware: incomplete past-due markers are red, incomplete future markers are dark grey, partial markers are yellow, and completed markers are green.
@@ -58,11 +60,11 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 - Week resource edits apply to that week and following weeks by default; the week panel can limit the change to only the selected week.
 - Working days default to 5; set 4 for a week with one national holiday.
 - Working-day reductions apply to every scheduled task in that week. A one-day team holiday makes each task's resource contribution 80% for that week.
-- Vacation days are person-days. A week can have multiple vacation entries for different scopes: the entire plan, selected categories, and selected tasks. Each entry reduces the affected tasks' contribution for that week.
+- Vacation days are person-days and can be fractional, such as `2.5`. A week can have multiple vacation entries for different scopes: the entire plan, selected categories, and selected tasks. Each entry reduces the affected tasks' contribution for that week.
 - Estimates and resource counts accept one decimal place, for example `12.7` man-weeks or `2.5` resources.
 - Tasks and categories can be moved up or down with small arrow controls in their focused side panel headers.
 - Editing a past week asks for confirmation before changing historical plan data.
-- Tasks in the past, or already in their final execution week, can be marked completed. Very old tasks are completed automatically on load, and their frozen history is removed again if the timeline is moved back into the future. Completed tasks show a subtle italic label plus a check icon in the grid.
+- Tasks in the past, or already in their final execution week, can use the task status dropdown to be marked completed. Very old tasks are completed automatically on load, and their frozen history is removed again if the timeline is moved back into the future. Completed tasks show a subtle italic label plus a check icon in the grid.
 - Selecting a category before adding a task makes the task inherit that category and color.
 - `Task`, `Category`, and `Dependency` open small focused side panels. New task/category names are preselected so typing replaces the starter text immediately. Dependency creation supports external deadlines and internal dependencies from tasks, categories, or external dependency predecessors to task/category successors.
 - Numeric fields use plain edit boxes rather than browser increment controls.

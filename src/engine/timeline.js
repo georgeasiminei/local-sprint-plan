@@ -81,6 +81,16 @@ export function isPastWeek(week, today = new Date()) {
   return end < today;
 }
 
+export function isCurrentWeek(week, today = new Date()) {
+  if (!week?.startDate || !week?.endDate) {
+    return false;
+  }
+
+  const start = new Date(`${week.startDate}T00:00:00`);
+  const end = new Date(`${week.endDate}T23:59:59`);
+  return start <= today && today <= end;
+}
+
 function normalizePlanningWeek(year, weekNumber) {
   let normalizedYear = Number(year) || DEFAULT_START_YEAR;
   let normalizedWeek = Number(weekNumber) || DEFAULT_START_WEEK;

@@ -2,6 +2,15 @@ import { CheckCircle2, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useTimelineStore } from '../../store/index.js';
 import { getEffectiveAllocationForEntry, getResourceAllocationForEntry } from '../../engine/allocationDisplay.js';
 import { findTaskShiftAtWeek } from '../../engine/taskTimelineEdits.js';
+import { isCurrentWeek, isPastWeek } from '../../engine/timeline.js';
+import {
+  getTaskStatusValue,
+  TASK_STATUS_AMBER,
+  TASK_STATUS_COLORS,
+  TASK_STATUS_COMPLETED,
+  TASK_STATUS_GREEN,
+  TASK_STATUS_RED,
+} from '../../engine/taskStatus.js';
 import { formatNumber } from '../../utils/format.js';
 import TaskCell from './TaskCell.jsx';
 import {
@@ -205,6 +214,8 @@ function TaskGridRow({
               : getResourceAllocationForEntry(document, task, week, entry);
             const shiftRule = findTaskShiftAtWeek(task, week.weekIndex);
             const isSelectedWeek = isSelected && selectedTaskWeekIndex === week.weekIndex;
+            const hasAllocatedUnits = Number(entry?.allocatedUnits) > 0;
+            const statusColor = getTaskCellStatusColor(task, week, hasAllocatedUnits);
             return (
               <TaskCell
                 key={week.id}
@@ -220,7 +231,7 @@ function TaskGridRow({
                 isSelected={isSelectedWeek}
                 isExternallyHighlighted={isExternallyHighlighted}
                 shiftRule={shiftRule}
-                cellColor={entry?.allocatedUnits ? rowColor : null}
+                cellColor={statusColor ?? (hasAllocatedUnits ? rowColor : null)}
               />
             );
           })
@@ -230,6 +241,28 @@ function TaskGridRow({
       </div>
     </>
   );
+}
+
+function getTaskCellStatusColor(task, week, hasAllocatedUnits = false) {
+  const status = getTaskStatusValue(task);
+
+  if (status === TASK_STATUS_COMPLETED && hasAllocatedUnits) {
+    return TASK_STATUS_COLORS[TASK_STATUS_COMPLETED];
+  }
+
+  if (status === TASK_STATUS_GREEN && isPastWeek(week)) {
+    return TASK_STATUS_COLORS[TASK_STATUS_GREEN];
+  }
+
+  if (status === TASK_STATUS_AMBER && isCurrentWeek(week)) {
+    return TASK_STATUS_COLORS[TASK_STATUS_AMBER];
+  }
+
+  if (status === TASK_STATUS_RED && isCurrentWeek(week)) {
+    return TASK_STATUS_COLORS[TASK_STATUS_RED];
+  }
+
+  return null;
 }
 
 function CollapsedRow({ row, rowHeight, weekCount, weekColumnWidth }) {

@@ -5,6 +5,7 @@ import {
   freezeTaskFromSchedule,
   isTaskCompletionAvailable,
 } from '../engine/taskCompletion.js';
+import { normalizeTaskHealthStatus, normalizeTaskStatus, TASK_STATUS_COMPLETED, TASK_STATUS_NONE } from '../engine/taskStatus.js';
 import { parseNonNegativeTenths } from '../utils/numbers.js';
 
 export function createTasksSlice(set, get) {
@@ -88,6 +89,44 @@ export function createTasksSlice(set, get) {
           ? document.schedule.filter((entry) => !(entry.taskId === taskId && entry.isManual))
           : document.schedule,
       })),
+    setTaskStatus: (taskId, status) =>
+      get().updateActiveDocument((document) => {
+        const normalizedStatus = normalizeTaskStatus(status);
+        const isCompletedStatus = normalizedStatus === TASK_STATUS_COMPLETED;
+
+        return {
+          ...document,
+          tasks: document.tasks.map((task) => {
+            if (task.id !== taskId) {
+              return task;
+            }
+
+            if (isCompletedStatus) {
+              if (!isTaskCompletionAvailable(document, taskId)) {
+                return task;
+              }
+
+              return freezeTaskFromSchedule(task, document.schedule);
+            }
+
+            const editableTask = clearTaskCompletion(task);
+            const healthStatus = normalizedStatus === TASK_STATUS_NONE ? undefined : normalizeTaskHealthStatus(normalizedStatus);
+
+            if (!healthStatus) {
+              const { status: currentStatus, ...rest } = editableTask;
+              return rest;
+            }
+
+            return {
+              ...editableTask,
+              status: healthStatus,
+            };
+          }),
+          schedule: isCompletedStatus
+            ? document.schedule.filter((entry) => !(entry.taskId === taskId && entry.isManual))
+            : document.schedule,
+        };
+      }),
     removeTask: (taskId) =>
       updateDocument(get, {
         tasks: (tasks) => tasks.filter((task) => task.id !== taskId),
@@ -116,7 +155,7 @@ export function createTasksSlice(set, get) {
 }
 
 function setVacationDays(vacations = [], weekIndex, dayCount) {
-  const normalizedDayCount = Math.max(0, Math.floor(Number(dayCount) || 0));
+  const normalizedDayCount = parseNonNegativeTenths(dayCount);
   const retained = vacations.filter((vacation) => vacation.weekIndex !== weekIndex);
 
   if (normalizedDayCount === 0) {

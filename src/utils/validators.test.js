@@ -142,4 +142,15 @@ describe('validatePlanDocument', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Plan viewStartWeek must be a string.');
   });
+
+  it('rejects unknown task statuses', () => {
+    const result = validatePlanDocument(
+      createPlanFixture({
+        tasks: [{ id: 'task-1', name: 'One', priority: 1, estimateWeeks: 1, status: 'blocked' }],
+      }),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Task task-1 status must be green, amber, or red.');
+  });
 });

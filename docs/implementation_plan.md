@@ -32,23 +32,24 @@ Build and maintain a live local-only React planning app whose single active plan
 - Week resource edits live in the focused week panel. They apply from the selected week onward by default, with an "apply only to this week" checkbox for one-week changes.
 - Task/category colors render only in scheduled cells with allocated resources.
 - Working days default to 5 and are edited from the week panel. A four-day holiday week contributes `resourceCount * 4 / 5` capacity while leaving the raw total capacity row unchanged, and that productivity factor scales every task allocation/cap in the affected week.
-- Vacation days are person-days edited from the week panel. A week can contain multiple scoped vacation entries at once. Entire-plan vacation days reduce every task's weekly contribution, category vacation days reduce tasks in that category, and task vacation days reduce only the selected task. Task-scoped vacation subtracts from that task's effective resources, so 2 raw resources with 5 task vacation days displays as 1 effective resource.
+- Vacation days are fractional-capable person-days edited from the week panel. A week can contain multiple scoped vacation entries at once. Entire-plan vacation days reduce every task's weekly contribution, category vacation days reduce tasks in that category, and task vacation days reduce only the selected task. Task-scoped vacation subtracts from that task's effective resources, so 2 raw resources with 2.5 task vacation days displays as 1.5 effective resources. If task vacation fully consumes a capped or overridden task's allocation, the scheduler keeps a zero-effective/raw-reserved entry so other tasks do not backfill that absent capacity.
 - Past week edits require confirmation before mutation.
 - Category edits live in the focused side panel; week capacity and vacation edits live in the focused week panel.
 - External dependency note boxes stay inside the visible timeline edge by choosing the available side and narrowing when necessary.
 - The timeline uses frozen category/task columns and compact task rows; category cells span their visible task rows like merged spreadsheet cells.
 - Tasks created from a selected category inherit category and color.
 - `Task`, `Category`, and `Dependency` open focused right-side panels with close and delete controls. New task/category starter names are selected immediately for overwrite. Dependency creation supports external deadline markers and internal dependencies from task, category, or external dependency predecessors to task/category successors.
+- The task panel exposes a status dropdown. None keeps normal cell colors, Green colors past cells green, Amber colors the current week yellow, Red colors the current week red, and Completed freezes history while coloring only non-zero task cells green.
 - Numeric entry uses plain edit boxes rather than browser steppers.
 - Estimates and resource values are normalized to one decimal place.
-- The timeline has a checkbox to switch between editable resource allocation view and read-only effective resource view. The total effort row shows effective allocation/resource allocation.
-- Computed schedule rows carry effective allocation plus raw allocation when those differ, so raw totals stay stable at full capacity even when effective allocations are rounded. Completed task intervals preserve the same raw/effective distinction and continue to respect the view toggle.
+- The timeline has a checkbox to switch between editable resource allocation view and read-only effective resource view. The total effort row shows effective allocation/raw week capacity.
+- Computed schedule rows carry effective allocation plus raw allocation when those differ, so resource allocation cells stay stable even when effective allocations are rounded. Completed task intervals preserve the same raw/effective distinction and continue to respect the view toggle.
 - Task and category side panel headers expose discreet up/down icon controls for reordering the timeline list without cluttering the grid.
 - Selecting a task, category, or dependency and pressing Delete removes it, with past-week confirmation when historical schedule/deadline data is affected.
 
 ## Compact URL State
 
-- URL state uses a positional array schema with implicit IDs, numeric cross-references for task/category dependency endpoints, string tokens for external dependency predecessor endpoints, palette-index colors, numeric dependency statuses, and omitted defaults.
+- URL state uses a positional array schema with implicit IDs, numeric cross-references for task/category dependency endpoints, string tokens for external dependency predecessor endpoints, palette-index colors, numeric dependency statuses, numeric task health statuses, and omitted defaults.
 - Plan vacation days, categories, category vacation days, tasks, task vacation days, dependencies, external dependencies, teams, working-day adjustments, week resources, and manual/resource overrides are preserved as source data.
 - URL payloads use a single `d.` base64url deflate-raw format.
 - The current compact URL format is the first shipped hash format. If that positional schema ever changes incompatibly, add explicit URL-format versioning and migration before emitting the new format; object-document migrations alone are not enough for old shared links.

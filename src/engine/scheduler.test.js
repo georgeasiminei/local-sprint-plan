@@ -334,6 +334,33 @@ describe('recalculateSchedule', () => {
     ]);
   });
 
+  it('reserves raw allocation when task vacation fully absorbs a capped task', () => {
+    const document = createPlanDocument({
+      name: 'Fully vacationed task fixture',
+      startWeek: 1,
+      startingResourceCount: 2,
+    });
+    document.tasks = [
+      {
+        id: 'task-1',
+        categoryId: null,
+        name: 'Fully vacationed task',
+        priority: 1,
+        estimateWeeks: 1,
+        maxResources: 0.5,
+        vacations: [{ weekIndex: 1, dayCount: 2.5 }],
+      },
+      { id: 'task-2', categoryId: null, name: 'Backfill task', priority: 2, estimateWeeks: 2, maxResources: null },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule.filter((entry) => entry.weekIndex === 1)).toEqual([
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 0, rawAllocatedUnits: 0.5, isManual: false },
+      { taskId: 'task-2', weekIndex: 1, allocatedUnits: 1.5, isManual: false },
+    ]);
+  });
+
   it('preserves manual allocations and schedules the remaining estimate around them', () => {
     const document = createPlanDocument({
       name: 'Manual fixture',
