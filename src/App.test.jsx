@@ -876,6 +876,78 @@ describe('URL-owned app state', () => {
     expect(screen.getByLabelText(`Resource value for View mode task in ${firstWeek.label}`)).toHaveValue('2');
   });
 
+  it('marks inherited resource rules after their starting week', async () => {
+    const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+    const teamId = 'team-1';
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { startYear: weekYear, startWeek: weekNumber, startingResourceCount: 5 },
+        teams: [{ id: teamId, name: 'Team 1' }],
+        weekResources: [{ id: 'resource-1', teamId, weekIndex: weekNumber, resourceCount: 5 }],
+        tasks: [
+          {
+            id: 'task-1',
+            name: 'Inherited rule task',
+            priority: 1,
+            estimateWeeks: 5,
+            resourceOverrides: [{ weekIndex: weekNumber, allocatedUnits: 2 }],
+          },
+        ],
+      }),
+    );
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+    await screen.findByText('Inherited rule task');
+
+    const document = useTimelineStore.getState().getActiveDocument();
+    const firstCell = await screen.findByRole('button', {
+      name: `Set Inherited rule task resources in ${document.weeks[0].label}`,
+    });
+    const inheritedCell = await screen.findByRole('button', {
+      name: `Set Inherited rule task resources in ${document.weeks[1].label}`,
+    });
+
+    expect(firstCell).toHaveAttribute('data-resource-rule', 'start');
+    expect(inheritedCell).toHaveAttribute('data-resource-rule', 'inherited');
+    expect(within(inheritedCell).getByText('2')).toHaveAttribute('title', `Inherited resource rule from week ${weekNumber}: 2`);
+  });
+
+  it('colors resource-view cells that display raw allocation even when effective allocation is zero', async () => {
+    const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+    const teamId = 'team-1';
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { startYear: weekYear, startWeek: weekNumber, startingResourceCount: 2 },
+        teams: [{ id: teamId, name: 'Team 1' }],
+        weekResources: [{ id: 'resource-1', teamId, weekIndex: weekNumber, resourceCount: 2 }],
+        tasks: [
+          {
+            id: 'task-1',
+            name: 'Raw-only health task',
+            priority: 1,
+            estimateWeeks: 1,
+            maxResources: 0.5,
+            status: 'red',
+            vacations: [{ weekIndex: weekNumber, dayCount: 2.5 }],
+          },
+        ],
+      }),
+    );
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+    await screen.findByText('Raw-only health task');
+
+    const document = useTimelineStore.getState().getActiveDocument();
+    const currentCell = await screen.findByRole('button', {
+      name: `Set Raw-only health task resources in ${document.weeks[0].label}`,
+    });
+
+    expect(currentCell).toHaveTextContent('0.5');
+    expect(currentCell).toHaveStyle({ backgroundColor: TASK_STATUS_COLORS.red });
+  });
+
   it('selects resource cells without creating overrides and edits them explicitly', async () => {
     const user = userEvent.setup();
 

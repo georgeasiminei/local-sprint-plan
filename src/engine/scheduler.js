@@ -1,5 +1,5 @@
 import { MAX_CALCULATED_WEEKS, MIN_VISIBLE_WEEKS } from '../constants/defaults.js';
-import { expandDependenciesToTaskEdges, topologicalSort } from './dependencyGraph.js';
+import { expandDependenciesToTaskEdges, getEffectiveTaskPriorities, topologicalSort } from './dependencyGraph.js';
 import {
   applyFreeDays,
   applyVacationDays,
@@ -14,9 +14,16 @@ import { expandCompletedIntervals } from './taskCompletion.js';
 import { roundToTenths } from '../utils/numbers.js';
 
 export function recalculateSchedule(document) {
-  const tasks = [...(document.tasks ?? [])].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
   const dependencies = document.dependencies ?? [];
   const categories = document.categories ?? [];
+  const sourceTasks = document.tasks ?? [];
+  const taskIndex = new Map(sourceTasks.map((task, index) => [task.id, index]));
+  const effectivePriorities = getEffectiveTaskPriorities(sourceTasks, dependencies, categories);
+  const tasks = [...sourceTasks].sort((a, b) =>
+    (effectivePriorities.get(a.id) ?? a.priority ?? 0) - (effectivePriorities.get(b.id) ?? b.priority ?? 0) ||
+    (a.priority ?? 0) - (b.priority ?? 0) ||
+    (taskIndex.get(a.id) ?? 0) - (taskIndex.get(b.id) ?? 0),
+  );
   const externalDependencyById = new Map((document.externalDependencies ?? []).map((dependency) => [dependency.id, dependency]));
   const expandedDependencies = expandDependenciesToTaskEdges(tasks, categories, dependencies).map((dependency) => {
     if (dependency.predecessorType !== 'external') {
