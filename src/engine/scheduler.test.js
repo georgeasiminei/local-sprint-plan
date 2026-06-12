@@ -512,6 +512,33 @@ describe('recalculateSchedule', () => {
     ]);
   });
 
+  it('pulls prerequisites forward when they unlock higher-priority work', () => {
+    const document = createPlanDocument({ startWeek: 1, startingResourceCount: 1 });
+    document.tasks = [
+      { id: 'task-1', name: 'High-priority delivery', priority: 15, estimateWeeks: 1 },
+      { id: 'task-2', name: 'Lower-priority independent', priority: 18, estimateWeeks: 2 },
+      { id: 'task-3', name: 'Prerequisite for delivery', priority: 20, estimateWeeks: 1 },
+    ];
+    document.dependencies = [
+      {
+        id: 'dep-1',
+        predecessorType: 'task',
+        predecessorId: 'task-3',
+        successorType: 'task',
+        successorId: 'task-1',
+      },
+    ];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule).toEqual([
+      { taskId: 'task-3', weekIndex: 1, allocatedUnits: 1, isManual: false },
+      { taskId: 'task-1', weekIndex: 2, allocatedUnits: 1, isManual: false },
+      { taskId: 'task-2', weekIndex: 3, allocatedUnits: 1, isManual: false },
+      { taskId: 'task-2', weekIndex: 4, allocatedUnits: 1, isManual: false },
+    ]);
+  });
+
   it('keeps extending the timeline until long delayed tasks are fully scheduled', () => {
     const document = createPlanDocument({ startWeek: 16, startingResourceCount: 5 });
     document.tasks = [

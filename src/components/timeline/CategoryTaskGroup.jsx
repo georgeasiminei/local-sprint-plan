@@ -208,14 +208,14 @@ function TaskGridRow({
         {weeks.length > 0 ? (
           weeks.map((week) => {
             const entry = taskSchedule.find((item) => item.weekIndex === week.weekIndex);
-            const isOverride = (task.resourceOverrides ?? []).some((override) => override.weekIndex === week.weekIndex);
+            const resourceRule = getActiveResourceRule(task, week.weekIndex);
             const allocation = allocationView === 'effective'
               ? getEffectiveAllocationForEntry(entry)
               : getResourceAllocationForEntry(document, task, week, entry);
             const shiftRule = findTaskShiftAtWeek(task, week.weekIndex);
             const isSelectedWeek = isSelected && selectedTaskWeekIndex === week.weekIndex;
-            const hasAllocatedUnits = Number(entry?.allocatedUnits) > 0;
-            const statusColor = getTaskCellStatusColor(task, week, hasAllocatedUnits);
+            const hasDisplayedAllocation = Number(allocation) > 0;
+            const statusColor = getTaskCellStatusColor(task, week, hasDisplayedAllocation);
             return (
               <TaskCell
                 key={week.id}
@@ -225,13 +225,13 @@ function TaskGridRow({
                 week={week}
                 allocation={allocation}
                 isManual={entry?.isManual}
-                isOverride={isOverride}
+                resourceRule={resourceRule}
                 isLocked={task.completed || allocationView === 'effective'}
                 isEditable={allocationView === 'resource'}
                 isSelected={isSelectedWeek}
                 isExternallyHighlighted={isExternallyHighlighted}
                 shiftRule={shiftRule}
-                cellColor={statusColor ?? (hasAllocatedUnits ? rowColor : null)}
+                cellColor={statusColor ?? (hasDisplayedAllocation ? rowColor : null)}
               />
             );
           })
@@ -241,6 +241,22 @@ function TaskGridRow({
       </div>
     </>
   );
+}
+
+function getActiveResourceRule(task, weekIndex) {
+  const override = [...(task.resourceOverrides ?? [])]
+    .filter((item) => item.weekIndex <= weekIndex)
+    .sort((a, b) => b.weekIndex - a.weekIndex)[0];
+
+  if (!override) {
+    return null;
+  }
+
+  return {
+    allocatedUnits: override.allocatedUnits,
+    startsHere: override.weekIndex === weekIndex,
+    weekIndex: override.weekIndex,
+  };
 }
 
 function getTaskCellStatusColor(task, week, hasAllocatedUnits = false) {

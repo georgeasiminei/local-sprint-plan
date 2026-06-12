@@ -94,6 +94,40 @@ export function topologicalSort(tasks = [], dependencies = [], categories = []) 
   return { sortedIds, hasCycle, cycleNodes };
 }
 
+export function getEffectiveTaskPriorities(tasks = [], dependencies = [], categories = []) {
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const { outgoing } = buildDependencyGraph(tasks, dependencies, categories);
+  const visiting = new Set();
+  const memo = new Map();
+
+  function resolve(taskId) {
+    if (memo.has(taskId)) {
+      return memo.get(taskId);
+    }
+
+    const task = taskById.get(taskId);
+    const ownPriority = Number(task?.priority) || 0;
+
+    if (visiting.has(taskId)) {
+      return ownPriority;
+    }
+
+    visiting.add(taskId);
+    const successorPriorities = [...(outgoing.get(taskId) ?? [])].map((successorId) => resolve(successorId));
+    visiting.delete(taskId);
+
+    const effectivePriority = Math.min(ownPriority, ...successorPriorities);
+    memo.set(taskId, effectivePriority);
+    return effectivePriority;
+  }
+
+  for (const task of tasks) {
+    resolve(task.id);
+  }
+
+  return memo;
+}
+
 export function hasDependencyCycle(tasks = [], categories = [], dependencies = []) {
   return topologicalSort(tasks, dependencies, categories).hasCycle || hasEndpointCycle(tasks, categories, dependencies);
 }
