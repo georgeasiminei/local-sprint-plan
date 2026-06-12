@@ -20,6 +20,10 @@ export function getResourceAllocationForEntry(document, task, week, entry) {
     return roundToTenths(entry.rawAllocatedUnits);
   }
 
+  if (entry.isManual) {
+    return roundToTenths(entry.allocatedUnits ?? 0);
+  }
+
   const context = getDisplayCapacityContext(document, task, week);
   const effectiveAllocation = Number(entry.allocatedUnits) || 0;
 

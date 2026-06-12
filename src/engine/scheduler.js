@@ -464,6 +464,10 @@ function getRawAllocationForEffectiveAllocation(
   }
 
   if (Math.abs(effectiveAllocation - taskCapacity.effectiveCapacity) <= 0.05) {
+    if (Number.isFinite(taskCapacity.rawResourceCap) && taskCapacity.rawResourceCap < taskCapacity.rawAvailable - 0.05) {
+      return taskCapacity.rawResourceCap;
+    }
+
     if (taskCapacity.available <= taskCapacity.effectiveFromRawCap + 0.05) {
       return taskCapacity.rawAvailable;
     }

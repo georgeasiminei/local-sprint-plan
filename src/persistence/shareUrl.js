@@ -136,7 +136,12 @@ export function compactPlanDocument(document) {
     ),
     compactRows(
       document.schedule?.filter((entry) => entry.isManual),
-      (entry) => [taskIndex.get(entry.taskId), entry.weekIndex, entry.allocatedUnits],
+      (entry) => trimArray([
+        taskIndex.get(entry.taskId),
+        entry.weekIndex,
+        entry.allocatedUnits,
+        entry.rawAllocatedUnits ?? null,
+      ]),
     ),
   ]);
 }
@@ -268,6 +273,7 @@ export function expandCompactPlanDocument(compactDocument) {
       taskId: `t${entry[0] + 1}`,
       weekIndex: entry[1],
       allocatedUnits: entry[2],
+      ...(entry[3] !== null && entry[3] !== undefined ? { rawAllocatedUnits: entry[3] } : {}),
       isManual: true,
     })),
   };
@@ -328,7 +334,7 @@ function compactTeams(teams = [], firstResourceByTeam) {
 }
 
 function expandTeams(rows = []) {
-  if (rows.length === 0) {
+  if (!Array.isArray(rows) || rows.length === 0) {
     return [{ id: 'team1', name: 'Team 1', resourceCount: DEFAULT_RESOURCE_COUNT }];
   }
 

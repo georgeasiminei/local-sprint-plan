@@ -1,19 +1,28 @@
 import { resolveWeekResourceCount } from '../../engine/resourceResolver.js';
+import { getResourceAllocationForEntry } from '../../engine/allocationDisplay.js';
 import { useTimelineStore } from '../../store/index.js';
 import { formatNumber } from '../../utils/format.js';
 import { CATEGORY_COLUMN_WIDTH, TASK_COLUMN_WIDTH, weekGridColumns } from './layout.js';
 import { formatWeekTooltip } from './weekTooltip.js';
 
-export default function EffortSummaryRow({ document, rowHeight, weekColumnWidth }) {
+export default function EffortSummaryRow({ allocationView = 'resource', document, rowHeight, weekColumnWidth }) {
   const selectWeek = useTimelineStore((state) => state.selectWeek);
-  const effectiveAllocationByWeek = new Map();
+  const assignedByWeek = new Map();
   const firstTeam = document.teams?.[0];
   const startingResourceCount = document.plan?.startingResourceCount ?? document.weekResources?.[0]?.resourceCount ?? 0;
+  const taskById = new Map((document.tasks ?? []).map((task) => [task.id, task]));
+  const weekByIndex = new Map((document.weeks ?? []).map((week) => [week.weekIndex, week]));
 
   for (const entry of document.schedule ?? []) {
-    effectiveAllocationByWeek.set(
+    const task = taskById.get(entry.taskId);
+    const week = weekByIndex.get(entry.weekIndex);
+    const value = allocationView === 'effective'
+      ? entry.allocatedUnits ?? 0
+      : getResourceAllocationForEntry(document, task, week, entry) ?? 0;
+
+    assignedByWeek.set(
       entry.weekIndex,
-      (effectiveAllocationByWeek.get(entry.weekIndex) ?? 0) + (entry.allocatedUnits ?? 0),
+      (assignedByWeek.get(entry.weekIndex) ?? 0) + value,
     );
   }
 
@@ -31,7 +40,7 @@ export default function EffortSummaryRow({ document, rowHeight, weekColumnWidth 
       </div>
       <div className="grid col-start-3" style={{ gridTemplateColumns: weekGridColumns(document.weeks.length, weekColumnWidth) }}>
         {document.weeks.map((week) => {
-          const effectiveAssigned = effectiveAllocationByWeek.get(week.weekIndex) ?? 0;
+          const assigned = assignedByWeek.get(week.weekIndex) ?? 0;
           const resourceCapacity = firstTeam
             ? resolveWeekResourceCount(week.weekIndex, firstTeam.id, document.weekResources ?? [], startingResourceCount)
             : 0;
@@ -58,7 +67,7 @@ export default function EffortSummaryRow({ document, rowHeight, weekColumnWidth 
               }}
             >
               <span>
-                {formatNumber(effectiveAssigned)}/{formatNumber(resourceCapacity)}
+                {formatNumber(assigned)}/{formatNumber(resourceCapacity)}
               </span>
             </div>
           );

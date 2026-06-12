@@ -379,6 +379,23 @@ describe('URL plan payloads', () => {
     ]);
   });
 
+  it('round trips manual raw allocations in compact URL state', async () => {
+    const document = createPlanFixture({
+      tasks: [{ id: 'task-1', name: 'Manual task', priority: 1, estimateWeeks: 10 }],
+      schedule: [
+        { taskId: 'task-1', weekIndex: 4, allocatedUnits: 3.1, rawAllocatedUnits: 3.5, isManual: true },
+      ],
+    });
+
+    const compact = compactPlanDocument(document);
+    const decoded = await decodePlanFromHashPayload(await encodePlanToHashPayload(document));
+
+    expect(compact[8]).toEqual([[0, 4, 3.1, 3.5]]);
+    expect(decoded.schedule).toEqual([
+      { taskId: 't1', weekIndex: 4, allocatedUnits: 3.1, rawAllocatedUnits: 3.5, isManual: true },
+    ]);
+  });
+
   it('round trips view starting week in compact URL state', async () => {
     const document = createPlanFixture({
       plan: { viewStartWeek: '26.21' },
