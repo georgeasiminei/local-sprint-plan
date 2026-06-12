@@ -14,7 +14,7 @@ export default function TaskCell({
   rowHeight,
   allocation,
   isManual,
-  resourceRule = null,
+  isOverride,
   isLocked,
   isEditable = true,
   isSelected = false,
@@ -37,12 +37,6 @@ export default function TaskCell({
   const isEditing = editingResourceCell?.taskId === taskId && editingResourceCell?.weekIndex === week?.weekIndex;
   const hasNonZeroAllocation = Number(allocation) > 0;
   const showExternalHighlight = isExternallyHighlighted && hasNonZeroAllocation;
-  const hasResourceRule = Boolean(resourceRule);
-  const resourceRuleLabel = hasResourceRule
-    ? resourceRule.startsHere
-      ? `Resource rule starts here: ${resourceRule.allocatedUnits}`
-      : `Inherited resource rule from week ${resourceRule.weekIndex}: ${resourceRule.allocatedUnits}`
-    : null;
 
   useEffect(() => () => window.clearTimeout(clickTimerRef.current), []);
 
@@ -138,7 +132,6 @@ export default function TaskCell({
       } ${isSelected ? 'ring-2 ring-inset ring-focus/60' : showExternalHighlight ? 'ring-2 ring-inset ring-yellow-300' : ''}`}
       style={{ height: rowHeight, lineHeight: `${rowHeight}px`, ...(cellColor ? { backgroundColor: cellColor } : {}) }}
       data-external-highlighted={showExternalHighlight ? 'true' : undefined}
-      data-resource-rule={hasResourceRule ? (resourceRule.startsHere ? 'start' : 'inherited') : undefined}
       onClick={(event) => {
         event.stopPropagation();
         if (!isEditable || isLocked) {
@@ -245,13 +238,8 @@ export default function TaskCell({
         allocation ? (
           <span
             className={`inline-flex h-4 min-w-6 items-center justify-center rounded px-1 text-[11px] font-medium leading-4 ${
-              isManual || resourceRule?.startsHere
-                ? 'bg-amber-100 text-amber-800'
-                : hasResourceRule
-                  ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200'
-                  : 'bg-sky-100 text-sky-800'
+              isManual || isOverride ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'
             }`}
-            title={isManual ? 'Manual allocation' : resourceRuleLabel ?? undefined}
           >
             {allocation}
           </span>
