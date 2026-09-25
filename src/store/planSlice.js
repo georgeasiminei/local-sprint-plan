@@ -1,8 +1,33 @@
-import { DEFAULT_PLAN_NAME, DEFAULT_ROW_HEIGHT, DEFAULT_WEEK_COLUMN_WIDTH } from '../constants/defaults.js';
+import {
+  DEFAULT_PLAN_NAME,
+  DEFAULT_ROW_HEIGHT,
+  DEFAULT_WEEK_COLUMN_WIDTH,
+  MAX_VALID_START_YEAR,
+  MIN_VALID_START_YEAR,
+} from '../constants/defaults.js';
+import { PLANNING_WEEKS_PER_YEAR } from '../engine/timeline.js';
 import { createPlanDocument } from '../persistence/schema.js';
 import { parseNonNegativeTenths } from '../utils/numbers.js';
 
 const MAX_UNDO_STACK = 50;
+
+// Fields the UI selects/edits/holds open. hydratePlan (loading a snapshot, a JSON file,
+// or a fresh URL) must reset all of them - ids are re-derived positionally on every
+// load, so a stale selection from the previous plan can otherwise point at a completely
+// unrelated entity in the new one.
+const SELECTION_RESET = {
+  selectedTaskId: null,
+  selectedTaskWeekIndex: null,
+  selectedCategoryId: null,
+  selectedDependencyId: null,
+  selectedExternalDependencyId: null,
+  hoveredExternalDependencyId: null,
+  selectedWeekIndex: null,
+  editingResourceCell: null,
+  pendingPastWeekEdit: null,
+  isShiftTaskOpen: false,
+  isSidebarOpen: false,
+};
 
 export function createPlanSlice(set, get) {
   return {
@@ -13,6 +38,12 @@ export function createPlanSlice(set, get) {
     hasHydrated: false,
     savedPlanId: null,
     savedPlanName: null,
+    // Owned here alongside undo()/redo()/updateActiveDocument() - previously this
+    // initial state lived in uiSlice.js while all the logic that reads and writes it
+    // lived here, which is exactly the kind of state/logic split that lets a
+    // uiSlice-local action (the old pushUndo) bypass the 50-entry cap.
+    undoStack: [],
+    redoStack: [],
 
     hydratePlan: (document, options = {}) => {
       set({
@@ -26,12 +57,17 @@ export function createPlanSlice(set, get) {
         savedPlanName: options.savedPlanName ?? null,
         undoStack: [],
         redoStack: [],
+        ...SELECTION_RESET,
       });
     },
 
     createPlan: (name = DEFAULT_PLAN_NAME, options = {}) => {
       const document = createPlanDocument({ name, ...options });
 
+      // Reset undo/redo and selection exactly like hydratePlan: this replaces the
+      // active document with a different plan.id, and stale undo/redo entries or a
+      // selection from the previous plan would otherwise reference an id that no
+      // longer resolves under the new one.
       set(() => ({
         activePlanId: document.plan.id,
         plans: [document],
@@ -39,44 +75,12 @@ export function createPlanSlice(set, get) {
         hasAppliedAutoCompletion: false,
         savedPlanId: null,
         savedPlanName: null,
+        undoStack: [],
+        redoStack: [],
+        ...SELECTION_RESET,
       }));
 
       return document.plan.id;
-    },
-
-    setActivePlan: (planId) => {
-      if (planId === null) {
-        return;
-      }
-
-      if (!get().plans.some((document) => document.plan.id === planId)) {
-        return;
-      }
-
-      set({ activePlanId: planId, saveStatus: 'unsaved' });
-    },
-
-    renamePlan: (planId, name) => {
-      const nextName = name.trim();
-      if (!nextName) {
-        return;
-      }
-
-      set((state) => ({
-        plans: state.plans.map((document) =>
-          document.plan.id === planId
-            ? touchDocument({ ...document, plan: { ...document.plan, name: nextName } })
-            : document,
-        ),
-        saveStatus: 'unsaved',
-      }));
-    },
-
-    renameActivePlan: (name) => {
-      const activePlanId = get().activePlanId;
-      if (activePlanId) {
-        get().renamePlan(activePlanId, name);
-      }
     },
 
     updatePlanSettings: (patch) => {
@@ -84,9 +88,13 @@ export function createPlanSlice(set, get) {
         const currentStartWeek = document.plan.startWeek ?? document.weeks[0]?.weekIndex ?? 1;
         const currentStartYear = document.plan.startYear ?? document.weeks[0]?.weekYear ?? new Date().getFullYear();
         const nextStartWeek =
-          patch.startWeek !== undefined ? Math.max(1, Number(patch.startWeek) || currentStartWeek) : currentStartWeek;
+          patch.startWeek !== undefined
+            ? clampInteger(patch.startWeek, 1, PLANNING_WEEKS_PER_YEAR, currentStartWeek)
+            : currentStartWeek;
         const nextStartYear =
-          patch.startYear !== undefined ? Math.max(1, Number(patch.startYear) || currentStartYear) : currentStartYear;
+          patch.startYear !== undefined
+            ? clampInteger(patch.startYear, MIN_VALID_START_YEAR, MAX_VALID_START_YEAR, currentStartYear)
+            : currentStartYear;
         const startWeekDelta = nextStartWeek - currentStartWeek;
         const startingResourceCount =
           patch.startingResourceCount !== undefined
@@ -142,7 +150,19 @@ export function createPlanSlice(set, get) {
               patch.weekColumnWidth === undefined
                 ? (document.plan.weekColumnWidth ?? DEFAULT_WEEK_COLUMN_WIDTH)
                 : Math.max(24, Math.min(120, Math.round(Number(patch.weekColumnWidth) || DEFAULT_WEEK_COLUMN_WIDTH))),
+            vacations:
+              startWeekDelta === 0
+                ? (document.plan.vacations ?? [])
+                : (document.plan.vacations ?? []).map((vacation) => ({
+                    ...vacation,
+                    weekIndex: shiftWeekIndex(vacation.weekIndex, startWeekDelta),
+                  })),
           },
+          // Every week-indexed collection in the document shifts together. Previously
+          // only some of these moved (resource overrides, completed intervals, external
+          // due weeks, week resources, free days) while task/category/plan vacations,
+          // shift-rule anchors, and manual schedule rows stayed at their old absolute
+          // week index - silently detaching them from the rest of the plan.
           tasks:
             startWeekDelta === 0
               ? document.tasks
@@ -151,12 +171,35 @@ export function createPlanSlice(set, get) {
                   earliestStartWeek: task.earliestStartWeek ? task.earliestStartWeek + startWeekDelta : task.earliestStartWeek,
                   resourceOverrides: (task.resourceOverrides ?? []).map((override) => ({
                     ...override,
-                    weekIndex: Math.max(1, override.weekIndex + startWeekDelta),
+                    weekIndex: shiftWeekIndex(override.weekIndex, startWeekDelta),
                   })),
                   completedIntervals: (task.completedIntervals ?? []).map((interval) => ({
                     ...interval,
-                    startWeek: Math.max(1, interval.startWeek + startWeekDelta),
-                    endWeek: Math.max(1, (interval.endWeek ?? interval.startWeek) + startWeekDelta),
+                    startWeek: shiftWeekIndex(interval.startWeek, startWeekDelta),
+                    endWeek: shiftWeekIndex(interval.endWeek ?? interval.startWeek, startWeekDelta),
+                  })),
+                  vacations: (task.vacations ?? []).map((vacation) => ({
+                    ...vacation,
+                    weekIndex: shiftWeekIndex(vacation.weekIndex, startWeekDelta),
+                  })),
+                  shiftRules: (task.shiftRules ?? []).map((rule) => ({
+                    ...rule,
+                    anchorWeekIndex: shiftWeekIndex(rule.anchorWeekIndex, startWeekDelta),
+                    firstShiftedWeek: shiftWeekIndex(rule.firstShiftedWeek, startWeekDelta),
+                    sourceEntries: (rule.sourceEntries ?? []).map((entry) => ({
+                      ...entry,
+                      weekIndex: shiftWeekIndex(entry.weekIndex, startWeekDelta),
+                    })),
+                  })),
+                })),
+          categories:
+            startWeekDelta === 0
+              ? document.categories
+              : document.categories.map((category) => ({
+                  ...category,
+                  vacations: (category.vacations ?? []).map((vacation) => ({
+                    ...vacation,
+                    weekIndex: shiftWeekIndex(vacation.weekIndex, startWeekDelta),
                   })),
                 })),
           externalDependencies:
@@ -164,14 +207,21 @@ export function createPlanSlice(set, get) {
               ? (document.externalDependencies ?? [])
               : (document.externalDependencies ?? []).map((dependency) => ({
                   ...dependency,
-                  dueWeek: Math.max(1, (dependency.dueWeek ?? dependency.endWeek ?? dependency.startWeek) + startWeekDelta),
+                  dueWeek: shiftWeekIndex(dependency.dueWeek ?? dependency.endWeek ?? dependency.startWeek, startWeekDelta),
                 })),
           freedays:
             startWeekDelta === 0
               ? document.freedays
               : document.freedays.map((freeday) => ({
                   ...freeday,
-                  weekIndex: freeday.weekIndex ? freeday.weekIndex + startWeekDelta : freeday.weekIndex,
+                  weekIndex: freeday.weekIndex ? shiftWeekIndex(freeday.weekIndex, startWeekDelta) : freeday.weekIndex,
+                })),
+          schedule:
+            startWeekDelta === 0
+              ? document.schedule
+              : (document.schedule ?? []).map((entry) => ({
+                  ...entry,
+                  weekIndex: shiftWeekIndex(entry.weekIndex, startWeekDelta),
                 })),
           weekResources,
         };
@@ -215,6 +265,10 @@ export function createPlanSlice(set, get) {
           undoStack: state.undoStack.slice(0, -1),
           redoStack: [...state.redoStack, currentDocument],
           saveStatus: 'unsaved',
+          // The restored document can be missing whatever the undone action added
+          // (e.g. undoing "add task" while that task's panel is open) - clear only the
+          // selection fields that no longer resolve, rather than the whole selection.
+          ...sanitizeSelectionForDocument(state, previousDocument),
         };
       });
     },
@@ -235,33 +289,103 @@ export function createPlanSlice(set, get) {
           redoStack: state.redoStack.slice(0, -1),
           undoStack: [...state.undoStack, currentDocument].slice(-MAX_UNDO_STACK),
           saveStatus: 'unsaved',
+          ...sanitizeSelectionForDocument(state, nextDocument),
         };
       });
     },
 
     updateActiveDocument: (updater, options = {}) => {
       const activePlanId = get().activePlanId;
-      set((state) => ({
-        ...state,
-        plans: state.plans.map((document) => {
-          if (document.plan.id !== activePlanId) {
-            return document;
-          }
+      set((state) => {
+        const previousDocument = state.plans.find((document) => document.plan.id === activePlanId);
+        const updatedDocument = previousDocument ? updater(previousDocument) : previousDocument;
+        // A no-op edit (a rejected duplicate dependency, a boundary-clamped move, a
+        // manual allocation on a completed task, ...) must not push an undo entry or
+        // wipe the redo stack - otherwise a rejected action silently destroys whatever
+        // the user had just un-done.
+        if (!previousDocument || updatedDocument === previousDocument) {
+          return state;
+        }
 
-          const updated = updater(document);
-          return options.skipTouch ? updated : touchDocument(updated);
-        }),
-        undoStack:
-          options.skipUndo || options.skipSaveStatus
-            ? state.undoStack
-            : [...state.undoStack, state.plans.find((document) => document.plan.id === activePlanId)]
-                .filter(Boolean)
-                .slice(-MAX_UNDO_STACK),
-        redoStack: options.skipUndo || options.skipSaveStatus ? state.redoStack : [],
-        saveStatus: options.skipSaveStatus ? state.saveStatus : 'unsaved',
-      }));
+        return updateActiveDocumentState(state, activePlanId, updatedDocument, options);
+      });
     },
   };
+}
+
+function updateActiveDocumentState(state, activePlanId, updatedDocument, options) {
+  return {
+    ...state,
+    plans: state.plans.map((document) =>
+      document.plan.id === activePlanId
+        ? options.skipTouch
+          ? updatedDocument
+          : touchDocument(updatedDocument)
+        : document,
+    ),
+    undoStack:
+      options.skipUndo || options.skipSaveStatus
+        ? state.undoStack
+        : [...state.undoStack, state.plans.find((document) => document.plan.id === activePlanId)]
+            .filter(Boolean)
+            .slice(-MAX_UNDO_STACK),
+    redoStack: options.skipUndo || options.skipSaveStatus ? state.redoStack : [],
+    saveStatus: options.skipSaveStatus ? state.saveStatus : 'unsaved',
+  };
+}
+
+// Nulls out only the selection fields that no longer resolve against `document` -
+// used after undo/redo swaps in a different document version. Deliberately narrower
+// than hydratePlan's full SELECTION_RESET: undo/redo should not clear a selection that
+// is still valid just because something else changed.
+function sanitizeSelectionForDocument(state, document) {
+  if (!document) {
+    return {};
+  }
+
+  const taskIds = new Set((document.tasks ?? []).map((task) => task.id));
+  const categoryIds = new Set((document.categories ?? []).map((category) => category.id));
+  const dependencyIds = new Set((document.dependencies ?? []).map((dependency) => dependency.id));
+  const externalDependencyIds = new Set(
+    (document.externalDependencies ?? []).map((dependency) => dependency.id),
+  );
+  const patch = {};
+
+  if (state.selectedTaskId && !taskIds.has(state.selectedTaskId)) {
+    patch.selectedTaskId = null;
+    patch.selectedTaskWeekIndex = null;
+  }
+
+  if (state.selectedCategoryId && !categoryIds.has(state.selectedCategoryId)) {
+    patch.selectedCategoryId = null;
+  }
+
+  if (state.selectedDependencyId && !dependencyIds.has(state.selectedDependencyId)) {
+    patch.selectedDependencyId = null;
+  }
+
+  if (state.selectedExternalDependencyId && !externalDependencyIds.has(state.selectedExternalDependencyId)) {
+    patch.selectedExternalDependencyId = null;
+  }
+
+  if (state.editingResourceCell && !taskIds.has(state.editingResourceCell.taskId)) {
+    patch.editingResourceCell = null;
+  }
+
+  return patch;
+}
+
+function clampInteger(value, min, max, fallback) {
+  const parsed = Math.round(Number(value));
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function shiftWeekIndex(weekIndex, delta) {
+  return Math.max(1, weekIndex + delta);
 }
 
 function setVacationDays(vacations = [], weekIndex, dayCount) {

@@ -39,6 +39,53 @@ describe('URL-owned app state', () => {
     expect(useTimelineStore.getState().getActiveDocument().tasks[0].name).toBe('Loaded from URL');
   });
 
+  it('shows the URL write status in the header as an edit is debounced then committed', async () => {
+    const user = userEvent.setup();
+    const payload = await encodePlanToHashPayload(createPlanFixture({ plan: { name: 'Status plan' } }));
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+    await screen.findByText('Status plan');
+
+    await user.click(screen.getByRole('button', { name: 'New task' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Updating URL…');
+
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toHaveTextContent('URL updated');
+    });
+  });
+
+  it('shows the URL state error for a malformed hash instead of silently loading a blank plan', async () => {
+    window.history.replaceState(null, '', '/#d.not-valid-base64url!!!');
+
+    render(<App />);
+
+    expect(await screen.findByText(/URL state error:/)).toBeInTheDocument();
+    // The fallback plan is still shown so the app stays usable, but the error is visible.
+    expect(useTimelineStore.getState().getActiveDocument()).toBeTruthy();
+  });
+
+  it('reloads the plan when the hash changes in the same tab without a full navigation', async () => {
+    render(<App />);
+    await screen.findByText('Nothing is sent to a server, all data stays in this computer');
+    expect(screen.queryByText('Pasted plan')).not.toBeInTheDocument();
+
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { name: 'Pasted plan' },
+        tasks: [{ id: 'task-1', name: 'Pasted plan task', priority: 1, estimateWeeks: 1 }],
+      }),
+    );
+
+    act(() => {
+      window.history.pushState(null, '', `/#${payload}`);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+
+    expect(await screen.findByText('Pasted plan task')).toBeInTheDocument();
+    expect(useTimelineStore.getState().getActiveDocument().plan.name).toBe('Pasted plan');
+  });
+
   it('updates the hash after plan edits without writing localStorage', async () => {
     render(<App />);
     await screen.findByText('Nothing is sent to a server, all data stays in this computer');
@@ -513,6 +560,40 @@ describe('URL-owned app state', () => {
     await user.selectOptions(statusSelect, 'completed');
     expect(currentCell).toHaveStyle({ backgroundColor: TASK_STATUS_COLORS.completed });
     expect(useTimelineStore.getState().getActiveDocument().tasks[0].completed).toBe(true);
+  });
+
+  it('shows a read-only per-week sum row for a collapsed category, blank for unused weeks', async () => {
+    const user = userEvent.setup();
+    const { weekYear, weekNumber } = getCurrentIsoWeekInfo(new Date());
+    const payload = await encodePlanToHashPayload(
+      createPlanFixture({
+        plan: { startYear: weekYear, startWeek: weekNumber, startingResourceCount: 10 },
+        categories: [{ id: 'cat-1', name: 'Foundation', order: 1, color: '#f8fafc', collapsed: false, vacations: [] }],
+        tasks: [
+          { id: 'task-1', name: 'Task A', categoryId: 'cat-1', priority: 1, estimateWeeks: 1 },
+          { id: 'task-2', name: 'Task B', categoryId: 'cat-1', priority: 2, estimateWeeks: 1 },
+        ],
+      }),
+    );
+    window.history.replaceState(null, '', `/#${payload}`);
+
+    render(<App />);
+    await screen.findByText('Task A');
+    const document = useTimelineStore.getState().getActiveDocument();
+    const [firstWeek, secondWeek] = document.weeks;
+
+    // Both single-week tasks finish inside week 1 (10 starting resources easily covers
+    // 1 unit each), so the category's week-1 sum is 2.0 and week 2 has no activity at
+    // all - collapsing must show the former and leave the latter blank, not a "0.0".
+    await user.click(screen.getByRole('button', { name: 'Collapse category' }));
+
+    expect(screen.getByText('Collapsed')).toBeInTheDocument();
+    expect(screen.getByLabelText(`2.0 allocated in ${firstWeek.label} (read only, expand category to edit)`)).toHaveTextContent('2.0');
+    expect(screen.queryByLabelText(new RegExp(`allocated in ${secondWeek.label} `))).not.toBeInTheDocument();
+    expect(screen.queryByText('Task A')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Expand category' }));
+    expect(await screen.findByText('Task A')).toBeInTheDocument();
   });
 
   it('colors only non-empty past task cells green', async () => {

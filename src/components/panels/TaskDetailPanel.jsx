@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { GitBranch, MoveDown, MoveUp, Trash2 } from 'lucide-react';
+import { useDeferredDraft } from '../../hooks/useDeferredDraft.js';
 import { useTimelineStore } from '../../store/index.js';
 import Sidebar from '../layout/Sidebar.jsx';
 import Button from '../ui/Button.jsx';
@@ -25,8 +26,12 @@ export default function TaskDetailPanel({ document }) {
   const moveTask = useTimelineStore((state) => state.moveTask);
   const setTaskStatus = useTimelineStore((state) => state.setTaskStatus);
   const selectDependency = useTimelineStore((state) => state.selectDependency);
+  // No document.tasks[0] fallback here: a selectedTaskId that no longer resolves (e.g.
+  // after an undo, or a task deleted through some path that didn't clear the selection)
+  // must show the "select a task" placeholder below, not silently open a different
+  // task's data for editing under the id the grid still highlights.
   const task = useMemo(
-    () => document.tasks.find((item) => item.id === selectedTaskId) ?? document.tasks[0],
+    () => document.tasks.find((item) => item.id === selectedTaskId),
     [document.tasks, selectedTaskId],
   );
   const nameInputRef = useRef(null);
@@ -150,12 +155,16 @@ export default function TaskDetailPanel({ document }) {
           </label>
         </div>
 
-        <label className="block text-sm font-medium">
+        {/* A <label> here would forward a click anywhere on "Row color" to the first
+            swatch button inside ColorPicker (native label-click delegation to the
+            first labelable descendant), silently changing the color - use a plain
+            heading instead since this labels a button group, not one control. */}
+        <div className="block text-sm font-medium">
           Row color
           <div className="mt-2">
             <ColorPicker value={task.highlightColor} onChange={(color) => updateTask(task.id, { highlightColor: color })} />
           </div>
-        </label>
+        </div>
 
         <label className="block text-sm font-medium">
           Notes
@@ -238,13 +247,13 @@ function ReorderHeaderActions({ canMoveDown, canMoveUp, itemName, onMoveDown, on
 }
 
 function DeferredNumberInput({ value, onCommit, ...props }) {
-  const [draft, setDraft] = useState(String(value ?? ''));
-
-  useEffect(() => {
-    setDraft(String(value ?? ''));
-  }, [value]);
+  const { draft, setDraft, cancel, consumeCancelled } = useDeferredDraft(value);
 
   function commit() {
+    if (consumeCancelled()) {
+      return;
+    }
+
     const trimmed = draft.trim();
     if (trimmed === String(value ?? '')) {
       return;
@@ -265,7 +274,7 @@ function DeferredNumberInput({ value, onCommit, ...props }) {
           event.currentTarget.blur();
         }
         if (event.key === 'Escape') {
-          setDraft(String(value ?? ''));
+          cancel();
           event.currentTarget.blur();
         }
       }}

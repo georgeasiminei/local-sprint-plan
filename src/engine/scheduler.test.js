@@ -688,6 +688,35 @@ describe('recalculateSchedule', () => {
 
     const result = recalculateSchedule(document);
 
-    expect(result.warnings).toContain('Dependency cycle detected involving task-1, task-2.');
+    expect(result.warnings).toContain(
+      'Dependency cycle detected involving task-1, task-2. Existing manual and completed allocations were kept, but nothing new will be scheduled until the cycle is resolved.',
+    );
+  });
+
+  it('keeps existing manual and completed allocations when a dependency cycle is detected', () => {
+    const document = createPlanDocument({ startWeek: 1, startingResourceCount: 5 });
+    document.tasks = [
+      {
+        id: 'task-1',
+        name: 'First',
+        priority: 1,
+        estimateWeeks: 3,
+        completed: true,
+        completedIntervals: [{ startWeek: 1, endWeek: 1, allocatedUnits: 3 }],
+      },
+      { id: 'task-2', name: 'Second', priority: 2, estimateWeeks: 2 },
+    ];
+    document.dependencies = [
+      { id: 'dep-1', predecessorId: 'task-1', successorId: 'task-2' },
+      { id: 'dep-2', predecessorId: 'task-2', successorId: 'task-1' },
+    ];
+    document.schedule = [{ taskId: 'task-2', weekIndex: 2, allocatedUnits: 2, isManual: true }];
+
+    const result = recalculateSchedule(document);
+
+    expect(result.schedule).toEqual([
+      { taskId: 'task-2', weekIndex: 2, allocatedUnits: 2, isManual: true },
+      { taskId: 'task-1', weekIndex: 1, allocatedUnits: 3, isManual: false, isCompleted: true },
+    ]);
   });
 });

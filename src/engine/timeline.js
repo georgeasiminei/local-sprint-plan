@@ -2,7 +2,7 @@ import { DEFAULT_SPRINT_LENGTH_WEEKS, DEFAULT_START_WEEK, DEFAULT_START_YEAR, MI
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
-const PLANNING_WEEKS_PER_YEAR = 52;
+export const PLANNING_WEEKS_PER_YEAR = 52;
 
 export function buildCalculatedWeeks(startWeek = DEFAULT_START_WEEK, weekCount = MIN_VISIBLE_WEEKS, startYear = DEFAULT_START_YEAR) {
   const firstWeek = Number(startWeek) || DEFAULT_START_WEEK;
@@ -114,7 +114,13 @@ function getPlanningWeekStartDate(year, weekNumber) {
 }
 
 function getIsoWeekStartDate(year, weekNumber) {
-  const fourthOfJanuary = new Date(year, 0, 4);
+  // new Date(year, 0, 4) maps a two-digit year (e.g. 26) into 1900-1999 (1926), which
+  // silently moved a plan a century into the past. setFullYear on an explicit Date(0)
+  // takes the year literally instead, whatever it is; range validation of the year
+  // itself belongs to the callers that accept user/decoded input, not here.
+  const fourthOfJanuary = new Date(0);
+  fourthOfJanuary.setFullYear(year, 0, 4);
+  fourthOfJanuary.setHours(0, 0, 0, 0);
   const firstWeekStart = startOfIsoWeek(fourthOfJanuary);
   return addDays(firstWeekStart, (weekNumber - 1) * 7);
 }

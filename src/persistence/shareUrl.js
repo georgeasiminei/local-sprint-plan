@@ -1,11 +1,14 @@
 import {
+  COMPACT_URL_EPOCH_YEAR,
   DEFAULT_CATEGORY_COLORS,
   DEFAULT_PLAN_NAME,
   DEFAULT_RESOURCE_COUNT,
   DEFAULT_ROW_HEIGHT,
   DEFAULT_START_WEEK,
-  DEFAULT_START_YEAR,
   DEFAULT_WEEK_COLUMN_WIDTH,
+  MAX_CALCULATED_WEEKS,
+  MAX_VALID_START_YEAR,
+  MIN_VALID_START_YEAR,
   MIN_VISIBLE_WEEKS,
 } from '../constants/defaults.js';
 import { SCHEMA_VERSION } from '../constants/schemaVersion.js';
@@ -45,7 +48,7 @@ export async function decodePlanFromHashPayload(payload) {
 // [plan, categories, tasks, dependencies, externalDeps, teams, workingDayAdjustments, weekResources, manual]
 export function compactPlanDocument(document) {
   const firstWeekIndex = document.plan?.startWeek ?? document.weeks?.[0]?.weekIndex ?? DEFAULT_START_WEEK;
-  const startYear = document.plan?.startYear ?? document.weeks?.[0]?.weekYear ?? DEFAULT_START_YEAR;
+  const startYear = document.plan?.startYear ?? document.weeks?.[0]?.weekYear ?? COMPACT_URL_EPOCH_YEAR;
   const sprintStartNumber = document.plan?.sprintStartNumber ?? document.sprints?.[0]?.number ?? 1;
   const sprintStartOrder = document.plan?.sprintStartOrder ?? 1;
   const categoryIndex = new Map((document.categories ?? []).map((category, index) => [category.id, index]));
@@ -153,8 +156,8 @@ export function expandCompactPlanDocument(compactDocument) {
 
   const now = new Date().toISOString();
   const planRow = compactDocument[0] ?? [];
-  const startYear = planRow[2] ?? DEFAULT_START_YEAR;
-  const startWeek = planRow[3] ?? DEFAULT_START_WEEK;
+  const startYear = toSafeYear(planRow[2]);
+  const startWeek = toSafePositiveInteger(planRow[3], DEFAULT_START_WEEK);
   const sprintStartNumber = planRow[4] ?? 1;
   const sprintStartOrder = planRow[5] ?? 1;
   const teams = expandTeams(compactDocument[5]);
@@ -162,7 +165,7 @@ export function expandCompactPlanDocument(compactDocument) {
   const firstWeekIndex = weeks[0]?.weekIndex ?? startWeek;
   const categories = (compactDocument[1] ?? []).map((category = [], index) => ({
     id: `c${index + 1}`,
-    name: category[0] ?? `Category ${index + 1}`,
+    name: toSafeText(category[0], `Category ${index + 1}`),
     order: category[1] ?? index + 1,
     color: decodeColor(category[2]),
     collapsed: Boolean(category[3]),
@@ -174,12 +177,12 @@ export function expandCompactPlanDocument(compactDocument) {
     return {
       id: `t${index + 1}`,
       categoryId: task[0] === null || task[0] === undefined ? null : `c${task[0] + 1}`,
-      name: task[1] ?? `Task ${index + 1}`,
+      name: toSafeText(task[1], `Task ${index + 1}`),
       priority: task[2] ?? index + 1,
       estimateWeeks: task[3] ?? 1,
       calcWeeks: 0,
       highlightColor: decodeColor(task[4]),
-      notes: task[5] ?? '',
+      notes: toSafeText(task[5], ''),
       earliestStartWeek: task[6] ?? null,
       maxResources: task[7] ?? null,
       resourceOverrides: expandWeekValuePairs(task[8]).map(({ weekIndex, value }) => ({
@@ -212,10 +215,10 @@ export function expandCompactPlanDocument(compactDocument) {
   });
   const externalDependencies = (compactDocument[4] ?? []).map((dependency = [], index) => ({
     id: `x${index + 1}`,
-    name: dependency[0] ?? `External dependency ${index + 1}`,
+    name: toSafeText(dependency[0], `External dependency ${index + 1}`),
     dueWeek: dependency[1] ?? startWeek,
     status: CODE_TO_STATUS[dependency[2] ?? 0] ?? 'no',
-    notes: dependency[3] ?? '',
+    notes: toSafeText(dependency[3], ''),
     relatedTaskId: dependency[4] === null || dependency[4] === undefined ? null : `t${dependency[4] + 1}`,
   }));
   const freedays = (compactDocument[6] ?? []).map((freeday = [], index) => ({
@@ -223,7 +226,7 @@ export function expandCompactPlanDocument(compactDocument) {
     teamId: `team${(freeday[0] ?? 0) + 1}`,
     weekIndex: freeday[1] ?? null,
     date: freeday[2] ?? null,
-    reason: freeday[3] ?? DEFAULT_FREE_DAY_REASON,
+    reason: toSafeText(freeday[3], DEFAULT_FREE_DAY_REASON),
   }));
   const firstTeamResourceEntries = teams.map((team) => ({
     id: `wr-${team.id}-${firstWeekIndex}`,
@@ -245,8 +248,8 @@ export function expandCompactPlanDocument(compactDocument) {
     version: SCHEMA_VERSION,
     plan: {
       id: 'p1',
-      name: planRow[0] ?? DEFAULT_PLAN_NAME,
-      description: planRow[1] ?? '',
+      name: toSafeText(planRow[0], DEFAULT_PLAN_NAME),
+      description: toSafeText(planRow[1], ''),
       startYear,
       startWeek,
       sprintStartNumber,
@@ -309,7 +312,7 @@ function compactPlan(plan, { firstWeekIndex, sprintStartNumber, sprintStartOrder
   return trimArray([
     plan?.name && plan.name !== DEFAULT_PLAN_NAME ? plan.name : null,
     plan?.description || null,
-    startYear !== DEFAULT_START_YEAR ? startYear : null,
+    startYear !== COMPACT_URL_EPOCH_YEAR ? startYear : null,
     firstWeekIndex !== DEFAULT_START_WEEK ? firstWeekIndex : null,
     sprintStartNumber !== 1 ? sprintStartNumber : null,
     sprintStartOrder !== 1 ? sprintStartOrder : null,
@@ -340,7 +343,7 @@ function expandTeams(rows = []) {
 
   return rows.map((team = [], index) => ({
     id: `team${index + 1}`,
-    name: team[0] ?? `Team ${index + 1}`,
+    name: toSafeText(team[0], `Team ${index + 1}`),
     resourceCount: team[1],
   }));
 }
@@ -360,6 +363,30 @@ function decodeColor(value) {
   }
 
   return value ?? null;
+}
+
+// Decoded documents come from an untrusted source (a shared link, a hand-edited JSON
+// file, or a corrupted localStorage entry). These two helpers are the single place
+// that turns raw decoded values into safe scalars before they reach the rest of the
+// app - callers should never inline their own ad hoc type/range checks on decoded data.
+function toSafeYear(value) {
+  const year = Number(value);
+  if (!Number.isInteger(year) || year < MIN_VALID_START_YEAR || year > MAX_VALID_START_YEAR) {
+    return COMPACT_URL_EPOCH_YEAR;
+  }
+  return year;
+}
+
+function toSafePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : fallback;
+}
+
+// Only a real string is trusted through; any other type (object, array, number from a
+// hand-edited payload) falls back rather than being written into the document, since a
+// non-string name/notes value reaching a JSX text node crashes the whole render tree.
+function toSafeText(value, fallback) {
+  return typeof value === 'string' ? value : fallback;
 }
 
 function encodeDependencyReference(type, id, taskIndex, categoryIndex, externalDependencyIndex) {

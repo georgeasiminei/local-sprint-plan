@@ -1,7 +1,9 @@
-name: Deploy to GitHub Pages
+name: Test and Deploy to GitHub Pages
 
 on:
   push:
+    branches: ["main"]
+  pull_request:
     branches: ["main"]
 
   # Allows you to run this workflow manually from the Actions tab
@@ -12,13 +14,16 @@ permissions:
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs that are superseded
+# Allow only one concurrent deployment, queuing (never cancelling) any that arrive
+# while one is already running - an in-progress Pages deployment must be allowed to
+# finish; aborting it mid-flight leaves Pages reporting a failed deployment for no
+# reason other than a second push landing quickly.
 concurrency:
   group: "pages"
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,11 +32,30 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version-file: ".nvmrc"
+          cache: "npm"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Build
         run: npm run build
@@ -42,6 +66,9 @@ jobs:
           path: ./dist
 
   deploy:
+    # Only the main branch's own push actually publishes; a pull_request run still
+    # gets full test + build verification above without needing Pages deploy access.
+    if: github.event_name == 'push'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

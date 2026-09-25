@@ -37,7 +37,8 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 
 - Copy the current browser URL to share or preserve the current active plan.
 - Use local snapshots when you want named browser-local checkpoints.
-- CSV export downloads the computed schedule for review in spreadsheet tools.
+- CSV export downloads the computed schedule for review in spreadsheet tools, with week columns labeled by their `YY.WW` planning label.
+- Export JSON / Load JSON save the same compact document to a local file and load it back later, for sharing outside a URL or as an extra backup. They follow the same compatibility rules as the URL hash.
 
 ## Planning Details
 
@@ -70,7 +71,9 @@ Completed historical tasks store only compact frozen resource intervals, so old 
 - `Task`, `Category`, and `Dependency` open small focused side panels. New task/category names are preselected so typing replaces the starter text immediately. Dependency creation supports external deadlines and internal dependencies from tasks, categories, or external dependency predecessors to task/category successors.
 - Numeric fields use plain edit boxes rather than browser increment controls.
 - Pressing Delete with a task, category, or dependency selected deletes it; historical changes ask for confirmation first.
-- Shift bulk-moves checked tasks by a chosen number of weeks by changing their earliest-start constraint. Positive values delay selected tasks; negative values pull them earlier.
+- Shift moves the remaining work of the selected task-week cell forward by a positive whole or fractional number of weeks, storing a reversible shift rule; selecting the first shifted week and reopening Shift edits or deletes that rule.
+- Collapsing a category hides its task rows and shows one read-only line with the summed allocation for each week that has any activity in that category; weeks with none stay blank. Expand the category to edit individual tasks again.
+- The header shows a small "Updating URL…" / "URL updated" / "URL error" indicator next to the plan name as edits are written to the URL hash.
 
 ## Development Notes
 

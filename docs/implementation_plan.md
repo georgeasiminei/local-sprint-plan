@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Build and maintain a live local-only React planning app whose single active plan is owned by the browser URL hash. There is no backend, account system, database, JSON import/export flow, or multi-plan manager. Named `localStorage` saves exist only as explicit user-created snapshots. Because the project is live, compatibility for existing shared URLs and established workflows is a first-class requirement unless a breaking change is explicitly approved and documented with migration steps.
+Build and maintain a live local-only React planning app whose single active plan is owned by the browser URL hash. There is no backend, account system, database, or multi-plan manager. Named `localStorage` saves exist only as explicit user-created snapshots. Export JSON / Load JSON let a user save the same compact document to a local file and load it back later, sharing the URL hash's compatibility rules. Because the project is live, compatibility for existing shared URLs and established workflows is a first-class requirement unless a breaking change is explicitly approved and documented with migration steps.
 
 ## Current Architecture
 

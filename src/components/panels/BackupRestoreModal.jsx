@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Download, Upload } from 'lucide-react';
 import Button from '../ui/Button.jsx';
 import Modal from '../ui/Modal.jsx';
@@ -7,13 +7,18 @@ export default function BackupRestoreModal({ open, onClose, onDownload, onRestor
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
 
-  function close() {
-    setSelectedFile(null);
-    onClose();
-  }
+  // A successful restore closes this modal from the parent (setIsBackupRestoreModalOpen)
+  // rather than through this component's own close(), which would otherwise leave the
+  // old filename showing - with the destructive Restore button already enabled - the
+  // next time it opens.
+  useEffect(() => {
+    if (!open) {
+      setSelectedFile(null);
+    }
+  }, [open]);
 
   return (
-    <Modal title="Backup/restore" open={open} onClose={close}>
+    <Modal title="Backup/restore" open={open} onClose={onClose}>
       <div className="space-y-4">
         <section className="space-y-2 rounded border border-line p-3">
           <h3 className="text-sm font-semibold">Backup all saved plans</h3>
@@ -65,7 +70,7 @@ export default function BackupRestoreModal({ open, onClose, onDownload, onRestor
         </section>
 
         <div className="flex justify-end">
-          <Button variant="secondary" onClick={close}>
+          <Button variant="secondary" onClick={onClose}>
             Close
           </Button>
         </div>

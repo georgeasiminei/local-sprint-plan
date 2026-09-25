@@ -44,25 +44,8 @@ export function recalculateSchedule(document) {
   const sprintStartOrder = Number(document.plan?.sprintStartOrder) || 1;
   const startingResourceCount = Number(document.plan?.startingResourceCount) || 0;
   const { sortedIds, hasCycle, cycleNodes } = topologicalSort(tasks, dependencies, categories);
-
-  if (hasCycle) {
-    const weeks = buildCalculatedWeeks(startWeek, document.weeks?.length || MIN_VISIBLE_WEEKS, startYear);
-    return {
-      tasks: document.tasks ?? [],
-      weeks,
-      sprints: buildFixedSprints(weeks, sprintStartNumber, sprintStartOrder),
-      schedule: [],
-      warnings: [
-        cycleNodes.length > 0
-          ? `Dependency cycle detected involving ${cycleNodes.join(', ')}.`
-          : 'Dependency cycle detected.',
-      ],
-    };
-  }
-
-  const taskById = new Map(tasks.map((task) => [task.id, task]));
-  const categoryById = new Map(categories.map((category) => [category.id, category]));
-  const dependenciesBySuccessor = groupDependenciesBySuccessor(expandedDependencies);
+  // Computed up front (not just in the happy path) so a dependency cycle can still
+  // preserve the plan's manual and completed allocations instead of wiping them.
   const completedTaskIds = new Set(tasks.filter((task) => task.completed).map((task) => task.id));
   const completedEntries = tasks.flatMap((task) =>
     task.completed ? expandCompletedIntervals(task.id, task.completedIntervals ?? []) : [],
@@ -73,6 +56,28 @@ export function recalculateSchedule(document) {
       !completedTaskIds.has(entry.taskId) &&
       tasks.some((task) => task.id === entry.taskId),
   );
+
+  if (hasCycle) {
+    const weeks = buildCalculatedWeeks(startWeek, document.weeks?.length || MIN_VISIBLE_WEEKS, startYear);
+    return {
+      tasks: document.tasks ?? [],
+      weeks,
+      sprints: buildFixedSprints(weeks, sprintStartNumber, sprintStartOrder),
+      // Keep whatever was already committed to the plan (manual edits, frozen history)
+      // instead of returning an empty schedule - a cycle should block *new* scheduling,
+      // not silently delete every task's existing allocations from the document.
+      schedule: [...manualEntries, ...completedEntries],
+      warnings: [
+        cycleNodes.length > 0
+          ? `Dependency cycle detected involving ${cycleNodes.join(', ')}. Existing manual and completed allocations were kept, but nothing new will be scheduled until the cycle is resolved.`
+          : 'Dependency cycle detected. Existing manual and completed allocations were kept, but nothing new will be scheduled until the cycle is resolved.',
+      ],
+    };
+  }
+
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const categoryById = new Map(categories.map((category) => [category.id, category]));
+  const dependenciesBySuccessor = groupDependenciesBySuccessor(expandedDependencies);
   const allocatedByWeek = createAllocationMap([...manualEntries, ...completedEntries], (entry) => entry.allocatedUnits);
   const rawAllocatedByWeek = createAllocationMap(
     [...manualEntries, ...completedEntries],
@@ -80,6 +85,10 @@ export function recalculateSchedule(document) {
   );
   const manualEntriesByTask = groupManualEntriesByTask(manualEntries);
   const completionWeekByTask = new Map();
+  // Tasks that hit the MAX_CALCULATED_WEEKS ceiling with work still remaining. A
+  // dependent of one of these has no real completion week to start after, so it must
+  // not be treated as unconstrained (see getEarliestStartWeek).
+  const incompleteTaskIds = new Set();
   const schedule = [];
   const warnings = [];
   let requiredWeekCount = document.weeks?.length || MIN_VISIBLE_WEEKS;
@@ -96,7 +105,14 @@ export function recalculateSchedule(document) {
       continue;
     }
 
-    const earliestStartWeek = getEarliestStartWeek(task, dependenciesBySuccessor, completionWeekByTask, startWeek);
+    const earliestStartWeek = getEarliestStartWeek(
+      task,
+      dependenciesBySuccessor,
+      completionWeekByTask,
+      startWeek,
+      incompleteTaskIds,
+      warnings,
+    );
     const scheduleOptions = {
       task,
       weeks,
@@ -153,6 +169,7 @@ export function recalculateSchedule(document) {
 
     if (result.remainingEstimate > 0) {
       warnings.push(`${task.name} could not be fully scheduled within ${MAX_CALCULATED_WEEKS} weeks.`);
+      incompleteTaskIds.add(task.id);
     }
   }
 
@@ -162,15 +179,28 @@ export function recalculateSchedule(document) {
     return { ...task, calcWeeks };
   });
 
-  const lastScheduledWeek = Math.max(
-    startWeek + MIN_VISIBLE_WEEKS - 1,
-    ...schedule.map((entry) => entry.weekIndex),
-    ...expandedDependencies.map((dependency) =>
+  // A plain `Math.max(...values)` spread throws for very large arrays (call-stack /
+  // argument-count limits) and gives no protection against absurd input values (e.g. a
+  // corrupted or maliciously crafted dueWeek/weekIndex). safeMax avoids both, and the
+  // Math.min clamp below is the single choke point that keeps buildCalculatedWeeks from
+  // ever being asked to materialize an unbounded number of week objects.
+  let lastScheduledWeek = safeMax(startWeek + MIN_VISIBLE_WEEKS - 1, schedule.map((entry) => entry.weekIndex));
+  lastScheduledWeek = safeMax(
+    lastScheduledWeek,
+    expandedDependencies.map((dependency) =>
       dependency.successorId ? completionWeekByTask.get(dependency.successorId) ?? startWeek : startWeek,
     ),
-    ...(document.externalDependencies ?? []).map((dependency) => dependency.dueWeek ?? dependency.endWeek ?? dependency.startWeek ?? startWeek),
   );
-  const finalWeekCount = Math.max(MIN_VISIBLE_WEEKS, lastScheduledWeek - startWeek + 1);
+  lastScheduledWeek = safeMax(
+    lastScheduledWeek,
+    (document.externalDependencies ?? []).map(
+      (dependency) => dependency.dueWeek ?? dependency.endWeek ?? dependency.startWeek ?? startWeek,
+    ),
+  );
+  const finalWeekCount = Math.min(
+    MAX_CALCULATED_WEEKS,
+    Math.max(MIN_VISIBLE_WEEKS, lastScheduledWeek - startWeek + 1),
+  );
   const finalWeeks = buildCalculatedWeeks(startWeek, finalWeekCount, startYear);
 
   return {
@@ -183,9 +213,18 @@ export function recalculateSchedule(document) {
 }
 
 function scheduleTask(options) {
-  const manualEntries = options.manualEntries
-    .filter((entry) => entry.weekIndex >= options.earliestStartWeek)
-    .sort((a, b) => a.weekIndex - b.weekIndex);
+  // Manual entries are kept even when their week falls before the task's (possibly
+  // dependency-driven) earliest start week. They were already counted against this
+  // task's estimate and against shared week capacity by the caller regardless of
+  // timing, so silently dropping them here would delete user data from the document
+  // while the capacity they consumed stayed spent for other tasks. Warn instead.
+  const manualEntries = [...options.manualEntries].sort((a, b) => a.weekIndex - b.weekIndex);
+  const earlyManualEntries = manualEntries.filter((entry) => entry.weekIndex < options.earliestStartWeek);
+  if (earlyManualEntries.length > 0) {
+    options.warnings.push(
+      `${options.task.name} has a manual allocation before its earliest start week; it was kept as scheduled.`,
+    );
+  }
   const manualTotal = roundAllocation(manualEntries.reduce((total, entry) => total + (entry.allocatedUnits ?? 0), 0));
   const state = {
     entries: [...manualEntries],
@@ -235,11 +274,20 @@ function scheduleTask(options) {
       continue;
     }
     const allocation = Math.min(state.remainingEstimate, taskCapacity.effectiveCapacity);
+    // Round before branching: a raw allocation as small as 0.04 rounds to 0 tenths of
+    // a resource, and used to still push a schedule entry that showed zero effort but
+    // consumed a week and inflated calcWeeks. Branching on the rounded value means a
+    // negligible residual falls through to the "no real work this week" path below.
+    const allocatedUnits = allocation > 0 ? roundAllocation(allocation) : 0;
 
-    if (allocation > 0) {
-      const allocatedUnits = roundAllocation(allocation);
+    if (allocatedUnits > 0) {
       const rawAllocatedUnits = roundAllocation(
-        getRawAllocationForEffectiveAllocation(allocation, taskCapacity, capacity.productivityFactor, capacity.taskVacationResourceLoss),
+        getRawAllocationForEffectiveAllocation(
+          allocatedUnits,
+          taskCapacity,
+          capacity.productivityFactor,
+          capacity.taskVacationResourceLoss,
+        ),
       );
       state.entries.push({
         taskId: options.task.id,
@@ -248,7 +296,7 @@ function scheduleTask(options) {
         ...(rawAllocatedUnits !== allocatedUnits ? { rawAllocatedUnits } : {}),
         isManual: false,
       });
-      state.remainingEstimate = roundAllocation(state.remainingEstimate - allocation);
+      state.remainingEstimate = roundAllocation(state.remainingEstimate - allocatedUnits);
     } else {
       const rawAllocatedUnits = getRawAllocationForFullyVacationedTask(taskCapacity, capacity.taskVacationResourceLoss);
       if (rawAllocatedUnits > 0) {
@@ -478,13 +526,32 @@ function getRawAllocationForEffectiveAllocation(
   return (effectiveAllocation + taskVacationResourceLoss) / productivityFactor;
 }
 
-function getEarliestStartWeek(task, dependenciesBySuccessor, completionWeekByTask, fallbackStartWeek) {
+function getEarliestStartWeek(
+  task,
+  dependenciesBySuccessor,
+  completionWeekByTask,
+  fallbackStartWeek,
+  incompleteTaskIds = new Set(),
+  warnings = [],
+) {
   const taskStartWeek = task.earliestStartWeek ?? fallbackStartWeek;
   const dependencyStartWeek = (dependenciesBySuccessor.get(task.id) ?? []).reduce((latestWeek, dependency) => {
     if (dependency.predecessorType === 'external') {
       return dependency.predecessorDueWeek
         ? Math.max(latestWeek, dependency.predecessorDueWeek + (dependency.lagWeeks ?? 0) + 1)
         : latestWeek;
+    }
+
+    // A predecessor that ran out of the scheduling horizon with work still left has no
+    // real completion week. Treating that as "unconstrained" would start the successor
+    // alongside its still-running predecessor instead of after it, so push it out past
+    // the horizon too (which surfaces via the same "could not be fully scheduled"
+    // warning) rather than silently ignoring the dependency.
+    if (incompleteTaskIds.has(dependency.predecessorId)) {
+      warnings.push(
+        `${task.name} depends on a task that could not be fully scheduled within ${MAX_CALCULATED_WEEKS} weeks, so its own start could not be constrained by that dependency.`,
+      );
+      return Math.max(latestWeek, fallbackStartWeek + MAX_CALCULATED_WEEKS);
     }
 
     const predecessorCompletionWeek = completionWeekByTask.get(dependency.predecessorId);
@@ -496,6 +563,16 @@ function getEarliestStartWeek(task, dependenciesBySuccessor, completionWeekByTas
   }, fallbackStartWeek);
 
   return Math.max(taskStartWeek, dependencyStartWeek);
+}
+
+function safeMax(initial, values) {
+  let max = initial;
+  for (const value of values) {
+    if (Number.isFinite(value) && value > max) {
+      max = value;
+    }
+  }
+  return max;
 }
 
 function groupDependenciesBySuccessor(dependencies) {

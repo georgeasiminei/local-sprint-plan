@@ -76,7 +76,7 @@ The app has one active plan. Runtime state uses a full document for rendering an
 Plan vacation days are person-days that reduce capacity across the whole plan for a week. Example: 10 vacation days means two people are away for one five-day week, reducing effective capacity by 2 resource-weeks. The reduction affects every task active in that week, similar to working-day adjustments.
 
 ### 3.3 Categories
-Groups of tasks — displayed as collapsible section headers spanning all columns.
+Groups of tasks — displayed as collapsible section headers spanning all columns. Collapsing a category hides its task rows and replaces them with one read-only line showing, for each week that has any allocation among the category's tasks, the sum of that week's allocated units across those tasks (in the plan's active resource/effective view); weeks with no allocation stay blank. This line is a summary only - editing happens by expanding the category again.
 ```json
 {
   "id": "c1",

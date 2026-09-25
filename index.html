@@ -4,11 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f172a" />
+    <meta
+      name="description"
+      content="Local-only project timeline and sprint planner. The active plan lives entirely in the browser URL; nothing is sent to a server."
+    />
+    <!--
+      No inline scripts exist anywhere in this app, so script-src 'self' costs nothing.
+      connect-src allows ws:/wss: to 'self' only for the Vite dev server's HMR socket
+      (npm run dev); the production build makes no network requests at all.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';"
+    />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Local Sprint Plan</title>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>This app requires JavaScript to run. Please enable it in your browser.</noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

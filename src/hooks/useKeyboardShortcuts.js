@@ -33,7 +33,7 @@ export function useKeyboardShortcuts() {
         }
       }
 
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !isTyping) {
         useTimelineStore.setState({
           selectedTaskId: null,
           selectedCategoryId: null,

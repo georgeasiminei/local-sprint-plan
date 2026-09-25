@@ -15,8 +15,6 @@ export function createUiSlice(set, get) {
     showEffectiveAllocations: false,
     editingResourceCell: null,
     pendingPastWeekEdit: null,
-    undoStack: [],
-    redoStack: [],
     selectTask: (taskId, weekIndex = null) =>
       set({
         selectedTaskId: taskId,
@@ -193,7 +191,6 @@ export function createUiSlice(set, get) {
       action?.();
     },
     cancelPastWeekEdit: () => set({ pendingPastWeekEdit: null }),
-    pushUndo: (entry) => set((state) => ({ undoStack: [...state.undoStack, entry], redoStack: [] })),
   };
 }
 

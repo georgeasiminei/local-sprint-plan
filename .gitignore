@@ -29,4 +29,7 @@ Thumbs.db
 pnpm-lock.yaml
 yarn.lock
 
-.claude
+# Claude Code: only the personal/local override file is ignored - a shared
+# .claude/settings.json (project permissions/hooks) or .claude/launch.json (dev server
+# preview config) should stay committed so every contributor gets the same setup.
+.claude/settings.local.json
