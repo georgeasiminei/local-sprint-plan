@@ -7,6 +7,7 @@ import Input from '../ui/Input.jsx';
 
 export default function ShiftTaskModal({ document, open, onClose }) {
   const [weekDelta, setWeekDelta] = useState('1');
+  const [error, setError] = useState('');
   const deleteTaskShift = useTimelineStore((state) => state.deleteTaskShift);
   const requestWeekEdit = useTimelineStore((state) => state.requestWeekEdit);
   const shiftTaskRemainder = useTimelineStore((state) => state.shiftTaskRemainder);
@@ -28,6 +29,7 @@ export default function ShiftTaskModal({ document, open, onClose }) {
     }
 
     setWeekDelta(selectedShift ? String(selectedShift.weekDelta ?? 1) : '1');
+    setError('');
   }, [open, selectedShift]);
 
   function confirm() {
@@ -35,8 +37,17 @@ export default function ShiftTaskModal({ document, open, onClose }) {
       return;
     }
 
+    // shiftTaskRemainder silently no-ops on a non-positive delta (see
+    // engine/taskTimelineEdits.js), so an invalid value must be rejected here instead
+    // of closing the modal as if the shift had been applied.
+    const delta = Number(weekDelta);
+    if (!Number.isFinite(delta) || delta <= 0) {
+      setError('Enter a number of weeks greater than 0.');
+      return;
+    }
+
     requestWeekEdit(anchorWeek, () =>
-      shiftTaskRemainder(selectedTaskId, anchorWeekIndex, Number(weekDelta) || 0, selectedShift?.id ?? null),
+      shiftTaskRemainder(selectedTaskId, anchorWeekIndex, delta, selectedShift?.id ?? null),
     );
     onClose();
   }
@@ -60,9 +71,13 @@ export default function ShiftTaskModal({ document, open, onClose }) {
             type="text"
             inputMode="decimal"
             value={weekDelta}
-            onChange={(event) => setWeekDelta(event.target.value)}
+            onChange={(event) => {
+              setWeekDelta(event.target.value);
+              setError('');
+            }}
           />
         </label>
+        {error ? <p className="text-xs text-red-700">{error}</p> : null}
 
         <div className="max-h-64 overflow-auto rounded border border-line">
           {selectedTask && anchorWeekIndex ? (

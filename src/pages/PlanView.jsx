@@ -19,6 +19,7 @@ import { useUndoRedo } from '../hooks/useUndoRedo.js';
 import { useTimelineStore } from '../store/index.js';
 import { downloadCsv, downloadJson, exportScheduleCsv } from '../persistence/exportPlan.js';
 import { compactPlanDocument, expandCompactPlanDocument } from '../persistence/shareUrl.js';
+import { validatePlanDocument } from '../utils/validators.js';
 import Button from '../components/ui/Button.jsx';
 import TimelineGrid from '../components/timeline/TimelineGrid.jsx';
 import ShiftTaskModal from '../components/panels/ShiftTaskModal.jsx';
@@ -57,6 +58,7 @@ export default function PlanView() {
   const isSidebarOpen = useTimelineStore((state) => state.isSidebarOpen);
   const openShiftTask = useTimelineStore((state) => state.openShiftTask);
   const saveStatus = useTimelineStore((state) => state.saveStatus);
+  const scheduleWarnings = useTimelineStore((state) => state.scheduleWarnings);
   const savedPlanId = useTimelineStore((state) => state.savedPlanId);
   const savedPlanName = useTimelineStore((state) => state.savedPlanName);
   const selectedCategoryId = useTimelineStore((state) => state.selectedCategoryId);
@@ -158,16 +160,15 @@ export default function PlanView() {
   function loadNamedPlan(savedPlanIdToLoad) {
     try {
       const { document: savedDocument, savedPlan } = loadSavedPlan(savedPlanIdToLoad);
-      hydratePlan(
-        {
-          ...savedDocument,
-          plan: {
-            ...savedDocument.plan,
-            name: savedPlan.name,
-          },
+      const nextDocument = {
+        ...savedDocument,
+        plan: {
+          ...savedDocument.plan,
+          name: savedPlan.name,
         },
-        { savedPlanId: savedPlan.id, savedPlanName: savedPlan.name },
-      );
+      };
+      assertValidPlanDocument(nextDocument);
+      hydratePlan(nextDocument, { savedPlanId: savedPlan.id, savedPlanName: savedPlan.name });
       setIsLoadModalOpen(false);
     } catch (error) {
       setImportError(error.message);
@@ -189,7 +190,9 @@ export default function PlanView() {
   async function loadJsonFile(file) {
     try {
       const compactDocument = JSON.parse(await readFileText(file));
-      hydratePlan(expandCompactPlanDocument(compactDocument));
+      const nextDocument = expandCompactPlanDocument(compactDocument);
+      assertValidPlanDocument(nextDocument);
+      hydratePlan(nextDocument);
       setIsLoadModalOpen(false);
     } catch (error) {
       setImportError(`Could not load JSON file. ${error.message}`);
@@ -226,8 +229,16 @@ export default function PlanView() {
               <span className="text-[11px] font-medium text-slate-500">
                 Nothing is sent to a server, all data stays in this computer
               </span>
+              <UrlStateIndicator saveStatus={saveStatus} />
             </div>
             {importError ? <div className="truncate text-[11px] text-red-700">URL state error: {importError}</div> : null}
+            {scheduleWarnings.length > 0 ? (
+              <div className="text-[11px] text-amber-700">
+                {scheduleWarnings.length === 1
+                  ? scheduleWarnings[0]
+                  : `${scheduleWarnings.length} scheduling warnings: ${scheduleWarnings.join(' ')}`}
+              </div>
+            ) : null}
             <div className="truncate text-[11px] text-slate-500">
               Original code:{' '}
               <a
@@ -392,6 +403,40 @@ export default function PlanView() {
       />
     </div>
   );
+}
+
+// Rejects a document that fails structural/referential validation before it ever
+// reaches hydratePlan. Both a saved snapshot (loadNamedPlan) and an imported JSON file
+// (loadJsonFile) can be a stale or hand-edited document referencing ids or weeks that
+// no longer exist; without this check the app would hydrate it anyway and hand broken
+// data straight to the scheduler and the grid.
+// saveStatus already cycles through these values live (see useUrlPlan.js), but nothing
+// rendered it - a user had no way to tell whether an edit had actually reached the URL
+// yet, or whether the last write had failed.
+const URL_STATE_LABELS = {
+  'updating url': { text: 'Updating URL…', className: 'text-slate-500' },
+  'url updated': { text: 'URL updated', className: 'text-emerald-700' },
+  'url error': { text: 'URL error', className: 'text-red-700' },
+};
+
+function UrlStateIndicator({ saveStatus }) {
+  const state = URL_STATE_LABELS[saveStatus];
+  if (!state) {
+    return null;
+  }
+
+  return (
+    <span className={`px-1 text-[11px] font-medium ${state.className}`} role="status">
+      · {state.text}
+    </span>
+  );
+}
+
+function assertValidPlanDocument(document) {
+  const result = validatePlanDocument(document);
+  if (!result.valid) {
+    throw new Error(result.errors[0] ?? 'Plan document is invalid.');
+  }
 }
 
 function readFileText(file) {

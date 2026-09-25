@@ -41,6 +41,12 @@ export default function CategoryTaskGroup({
   const rowCount = Math.max(visibleTasks.length, 1);
   const totals = getTaskTotals(tasks);
   const categoryDependencies = getDependenciesForEntity(document, 'category', category.id);
+  // Collapsing a category hides its per-task rows, but the per-week numbers behind them
+  // still matter for a quick read - only computed while collapsed, since an expanded
+  // category already shows this same information per task row.
+  const collapsedWeekTotals = category.collapsed
+    ? getCategoryWeekTotals(tasks, schedule, document, allocationView)
+    : null;
 
   return (
     <section
@@ -120,7 +126,13 @@ export default function CategoryTaskGroup({
           />
         ))
       ) : (
-        <CollapsedRow row={1} rowHeight={rowHeight} weekCount={weeks.length} weekColumnWidth={weekColumnWidth} />
+        <CollapsedRow
+          row={1}
+          rowHeight={rowHeight}
+          weeks={weeks}
+          weekColumnWidth={weekColumnWidth}
+          weekTotals={collapsedWeekTotals}
+        />
       )}
     </section>
   );
@@ -269,7 +281,9 @@ function getTaskCellStatusColor(task, week, hasAllocatedUnits = false) {
   return null;
 }
 
-function CollapsedRow({ row, rowHeight, weekCount, weekColumnWidth }) {
+function CollapsedRow({ row, rowHeight, weeks, weekColumnWidth, weekTotals }) {
+  const columns = weeks.length > 0 ? weeks : [null];
+
   return (
     <>
       <div
@@ -278,10 +292,21 @@ function CollapsedRow({ row, rowHeight, weekCount, weekColumnWidth }) {
       >
         Collapsed
       </div>
-      <div className="grid" style={{ gridColumn: 3, gridRow: row, gridTemplateColumns: weekGridColumns(weekCount, weekColumnWidth) }}>
-        {Array.from({ length: Math.max(weekCount, 1) }).map((_, index) => (
-          <div key={index} className="border-b border-r border-slate-200" style={{ height: rowHeight }} />
-        ))}
+      <div className="grid" style={{ gridColumn: 3, gridRow: row, gridTemplateColumns: weekGridColumns(weeks.length, weekColumnWidth) }}>
+        {columns.map((week, index) => {
+          const total = week ? weekTotals?.get(week.weekIndex) : undefined;
+
+          return (
+            <div
+              key={week?.id ?? index}
+              aria-label={total ? `${formatNumber(total)} allocated in ${week.label} (read only, expand category to edit)` : undefined}
+              className="overflow-hidden border-b border-r border-slate-200 px-1 text-center text-[11px] font-medium text-slate-500"
+              style={{ height: rowHeight, lineHeight: `${rowHeight}px` }}
+            >
+              {total ? formatNumber(total) : ''}
+            </div>
+          );
+        })}
       </div>
     </>
   );
@@ -295,4 +320,39 @@ function getTaskTotals(tasks) {
     }),
     { estimate: 0, calc: 0 },
   );
+}
+
+// Sums this category's per-week allocations across its tasks, for the read-only summary
+// line shown in place of individual task rows while the category is collapsed. Only
+// "used" weeks (a positive total) are kept - an empty Map entry would just render blank
+// anyway, but omitting them makes the "used week" contract explicit at the data level
+// rather than relying on the render to hide zeros.
+function getCategoryWeekTotals(tasks, schedule, document, allocationView) {
+  const taskIds = new Set(tasks.map((task) => task.id));
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const weekByIndex = new Map((document.weeks ?? []).map((week) => [week.weekIndex, week]));
+  const totals = new Map();
+
+  for (const entry of schedule) {
+    if (!taskIds.has(entry.taskId)) {
+      continue;
+    }
+
+    const task = taskById.get(entry.taskId);
+    const week = weekByIndex.get(entry.weekIndex);
+    const value =
+      allocationView === 'effective'
+        ? getEffectiveAllocationForEntry(entry)
+        : getResourceAllocationForEntry(document, task, week, entry);
+
+    totals.set(entry.weekIndex, (totals.get(entry.weekIndex) ?? 0) + (Number(value) || 0));
+  }
+
+  for (const [weekIndex, total] of totals) {
+    if (total <= 0) {
+      totals.delete(weekIndex);
+    }
+  }
+
+  return totals;
 }

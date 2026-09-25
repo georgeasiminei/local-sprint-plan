@@ -1,21 +1,8 @@
-import { createId } from '../utils/uuid.js';
 import { resolveWeekResourceCount } from '../engine/resourceResolver.js';
 import { parseNonNegativeTenths } from '../utils/numbers.js';
 
 export function createTeamsSlice(set, get) {
   return {
-    addTeam: (team = {}) =>
-      get().updateActiveDocument((document) => ({
-        ...document,
-        teams: [
-          ...document.teams,
-          {
-            id: createId('team', document.teams.map((team) => team.id)),
-            name: `Team ${document.teams.length + 1}`,
-            ...team,
-          },
-        ],
-      })),
     setWeekResource: (weekResource) =>
       get().updateActiveDocument((document) => {
         const resource = {

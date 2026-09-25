@@ -3,6 +3,7 @@ import { CheckSquare, MinusSquare, Square, Trash2 } from 'lucide-react';
 import { MAX_CALCULATED_WEEKS } from '../../constants/defaults.js';
 import { wouldCreateDependencyCycle } from '../../engine/dependencyGraph.js';
 import { buildCalculatedWeeks } from '../../engine/timeline.js';
+import { useDeferredDraft } from '../../hooks/useDeferredDraft.js';
 import { useTimelineStore } from '../../store/index.js';
 import {
   getDependencyEndpoint,
@@ -116,7 +117,16 @@ export default function DependencyDetailPanel({ document }) {
       return;
     }
 
-    addDependency(predecessorId, successorId, Number(lagWeeks) || 0, predecessorType, successorType);
+    // addDependency also rejects a duplicate of an existing dependency (checked only
+    // inside the store, not above) by returning null instead of throwing - without
+    // checking the result the form reset unconditionally, silently discarding the
+    // user's choices as if the add had succeeded.
+    const addedId = addDependency(predecessorId, successorId, Number(lagWeeks) || 0, predecessorType, successorType);
+    if (!addedId) {
+      setError('That dependency already exists.');
+      return;
+    }
+
     setPredecessorType('task');
     setPredecessorId('');
     setSuccessorType('task');
@@ -152,7 +162,7 @@ export default function DependencyDetailPanel({ document }) {
               <Input
                 className="mt-1 w-full"
                 type="text"
-                inputMode="numeric"
+                inputMode="decimal"
                 value={externalDueWeekLabel}
                 onChange={(event) => setExternalDueWeekLabel(event.target.value)}
               />
@@ -164,7 +174,7 @@ export default function DependencyDetailPanel({ document }) {
           </div>
         ) : (
           <div className="space-y-3">
-            <label className="block text-sm font-medium">
+            <div className="block text-sm font-medium">
               Depends on
               <DependencyEntitySelect
                 className="mt-1 w-full"
@@ -185,8 +195,8 @@ export default function DependencyDetailPanel({ document }) {
                 value={predecessorId}
                 onChange={setPredecessorId}
               />
-            </label>
-            <label className="block text-sm font-medium">
+            </div>
+            <div className="block text-sm font-medium">
               Waiting item
               <DependencyEntitySelect
                 className="mt-1 w-full"
@@ -207,7 +217,7 @@ export default function DependencyDetailPanel({ document }) {
                 value={successorId}
                 onChange={setSuccessorId}
               />
-            </label>
+            </div>
             {predecessorId || successorId ? (
               <p className="text-xs text-slate-500">Choices that would create a circular dependency are disabled.</p>
             ) : null}
@@ -283,7 +293,7 @@ function InternalDependencyEditor({ dependency, document, onDelete, onUpdate }) 
           depends on {getDependencyEntityName(document, predecessor.type, predecessor.id)}
         </div>
       </div>
-      <label className="block text-sm font-medium">
+      <div className="block text-sm font-medium">
         Depends on
         <DependencyEntitySelect
           className="mt-1 w-full"
@@ -310,8 +320,8 @@ function InternalDependencyEditor({ dependency, document, onDelete, onUpdate }) 
             commitEndpointPatch({ predecessorType: draftPredecessorType, predecessorId: value });
           }}
         />
-      </label>
-      <label className="block text-sm font-medium">
+      </div>
+      <div className="block text-sm font-medium">
         Waiting item
         <DependencyEntitySelect
           className="mt-1 w-full"
@@ -338,7 +348,7 @@ function InternalDependencyEditor({ dependency, document, onDelete, onUpdate }) 
             commitEndpointPatch({ successorType: draftSuccessorType, successorId: value });
           }}
         />
-      </label>
+      </div>
       <p className="text-xs text-slate-500">Choices that would create a circular dependency are disabled.</p>
       <label className="block text-sm font-medium">
         Lag weeks
@@ -360,7 +370,10 @@ function InternalDependencyEditor({ dependency, document, onDelete, onUpdate }) 
 }
 
 function ExternalDependencyEditor({ dependency, document, onDelete, onRequestWeekEdit, onUpdate }) {
-  const dependencyText = dependency.notes || dependency.name;
+  // Falling back to dependency.name here (rather than to '') meant deleting all text
+  // snapped the textarea back to the auto-derived title from before the edit, because
+  // an empty string is falsy - the field could never actually be cleared.
+  const dependencyText = dependency.notes ?? '';
   const dueWeekLabel = getWeekLabelByIndex(document, dependency.dueWeek ?? dependency.endWeek ?? dependency.startWeek);
 
   return (
@@ -648,13 +661,13 @@ function parseDueWeekLabel(document, value) {
 }
 
 function DeferredTextInput({ value, onCommit, ...props }) {
-  const [draft, setDraft] = useState(value ?? '');
-
-  useEffect(() => {
-    setDraft(value ?? '');
-  }, [value]);
+  const { draft, setDraft, cancel, consumeCancelled } = useDeferredDraft(value, (raw) => raw ?? '');
 
   function commit() {
+    if (consumeCancelled()) {
+      return;
+    }
+
     if (draft !== value) {
       onCommit(draft);
     }
@@ -664,7 +677,9 @@ function DeferredTextInput({ value, onCommit, ...props }) {
     <Input
       {...props}
       type="text"
-      inputMode="numeric"
+      // "decimal" (not "numeric") because this field holds a dotted YY.WW planning-week
+      // label - the numeric keypad on iOS has no "." key.
+      inputMode="decimal"
       value={draft}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}
@@ -673,7 +688,7 @@ function DeferredTextInput({ value, onCommit, ...props }) {
           event.currentTarget.blur();
         }
         if (event.key === 'Escape') {
-          setDraft(value ?? '');
+          cancel();
           event.currentTarget.blur();
         }
       }}

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useTimelineStore } from '../../store/index.js';
 import { DEFAULT_ROW_HEIGHT, DEFAULT_WEEK_COLUMN_WIDTH } from '../../constants/defaults.js';
+import { useDeferredDraft } from '../../hooks/useDeferredDraft.js';
+import { useTimelineStore } from '../../store/index.js';
 import Sidebar from '../layout/Sidebar.jsx';
 import Badge from '../ui/Badge.jsx';
 import Input from '../ui/Input.jsx';
@@ -91,13 +91,13 @@ export default function PlanSettingsPanel({ document }) {
 }
 
 function DeferredTextSettingInput({ value, onCommit, ...props }) {
-  const [draft, setDraft] = useState(String(value ?? ''));
-
-  useEffect(() => {
-    setDraft(String(value ?? ''));
-  }, [value]);
+  const { draft, setDraft, cancel, consumeCancelled } = useDeferredDraft(value);
 
   function commit() {
+    if (consumeCancelled()) {
+      return;
+    }
+
     const nextValue = draft.trim();
     if (nextValue !== String(value ?? '')) {
       onCommit(nextValue);
@@ -116,7 +116,7 @@ function DeferredTextSettingInput({ value, onCommit, ...props }) {
           event.currentTarget.blur();
         }
         if (event.key === 'Escape') {
-          setDraft(String(value ?? ''));
+          cancel();
           event.currentTarget.blur();
         }
       }}
@@ -125,13 +125,13 @@ function DeferredTextSettingInput({ value, onCommit, ...props }) {
 }
 
 function DeferredSettingInput({ value, onCommit, ...props }) {
-  const [draft, setDraft] = useState(String(value));
-
-  useEffect(() => {
-    setDraft(String(value));
-  }, [value]);
+  const { draft, setDraft, cancel, consumeCancelled } = useDeferredDraft(value);
 
   function commit() {
+    if (consumeCancelled()) {
+      return;
+    }
+
     const trimmed = draft.trim();
     if (!trimmed) {
       setDraft(String(value));
@@ -160,7 +160,7 @@ function DeferredSettingInput({ value, onCommit, ...props }) {
           event.currentTarget.blur();
         }
         if (event.key === 'Escape') {
-          setDraft(String(value));
+          cancel();
           event.currentTarget.blur();
         }
       }}

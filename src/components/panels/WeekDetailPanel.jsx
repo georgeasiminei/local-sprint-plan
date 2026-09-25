@@ -5,6 +5,7 @@ import {
   resolveWeekResourceCount,
   resolveWorkingDaysForWeek,
 } from '../../engine/resourceResolver.js';
+import { useDeferredDraft } from '../../hooks/useDeferredDraft.js';
 import { useTimelineStore } from '../../store/index.js';
 import Sidebar from '../layout/Sidebar.jsx';
 import Input from '../ui/Input.jsx';
@@ -290,13 +291,13 @@ function getVacationEntries(document, week, options) {
 }
 
 function DeferredNumberInput({ value, onCommit, ...props }) {
-  const [draft, setDraft] = useState(String(value ?? ''));
-
-  useEffect(() => {
-    setDraft(String(value ?? ''));
-  }, [value]);
+  const { draft, setDraft, cancel, consumeCancelled } = useDeferredDraft(value);
 
   function commit() {
+    if (consumeCancelled()) {
+      return;
+    }
+
     if (draft === String(value ?? '')) {
       return;
     }
@@ -316,7 +317,7 @@ function DeferredNumberInput({ value, onCommit, ...props }) {
           event.currentTarget.blur();
         }
         if (event.key === 'Escape') {
-          setDraft(String(value ?? ''));
+          cancel();
           event.currentTarget.blur();
         }
       }}

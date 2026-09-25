@@ -1,3 +1,4 @@
+import { MAX_CALCULATED_WEEKS } from '../constants/defaults.js';
 import { SCHEMA_VERSION } from '../constants/schemaVersion.js';
 
 const ROOT_ARRAY_KEYS = [
@@ -94,9 +95,15 @@ export function validatePlanDocument(document) {
   const categoryIds = new Set(document.categories.map((category) => category.id));
   const taskIds = new Set(document.tasks.map((task) => task.id));
   const teamIds = new Set(document.teams.map((team) => team.id));
-  const weekIndexes = new Set(document.weeks.map((week) => week.weekIndex));
+  // The plan's own start week and MAX_CALCULATED_WEEKS bound what a week-indexed field
+  // (a sprint boundary, a week resource rule, a manual schedule entry) may legitimately
+  // reference. `weekIndexes` above is NOT that bound: a document fresh out of
+  // expandCompactPlanDocument only has a MIN_VISIBLE_WEEKS placeholder `weeks` array
+  // (the scheduler expands it later), so validating against `weekIndexes` directly
+  // rejected perfectly valid documents whose data reaches past week 4.
+  const firstWeekIndex = document.plan?.startWeek ?? 1;
 
-  validateTasks(document.tasks, categoryIds, errors);
+  validateTasks(document.tasks, categoryIds, firstWeekIndex, errors);
   validateDependencies(
     document.dependencies,
     taskIds,
@@ -104,14 +111,14 @@ export function validatePlanDocument(document) {
     new Set(document.externalDependencies.map((dependency) => dependency.id)),
     errors,
   );
-  validateExternalDependencies(document.externalDependencies, taskIds, errors);
+  validateExternalDependencies(document.externalDependencies, taskIds, firstWeekIndex, errors);
   validateWeeks(document.weeks, errors);
-  validateSprints(document.sprints, weekIndexes, errors);
+  validateSprints(document.sprints, firstWeekIndex, errors);
   validateTeams(document.teams, errors);
-  validateFreeDays(document.freedays, teamIds, errors);
-  validateWeekResources(document.weekResources, teamIds, weekIndexes, errors);
+  validateFreeDays(document.freedays, teamIds, firstWeekIndex, errors);
+  validateWeekResources(document.weekResources, teamIds, firstWeekIndex, errors);
   validateInitialWeekResources(document.teams, document.weeks, document.weekResources, errors);
-  validateSchedule(document.schedule, taskIds, weekIndexes, errors);
+  validateSchedule(document.schedule, taskIds, firstWeekIndex, errors);
 
   return { valid: errors.length === 0, errors };
 }
@@ -133,7 +140,7 @@ function validateCollectionIds(name, items, errors) {
   }
 }
 
-function validateTasks(tasks, categoryIds, errors) {
+function validateTasks(tasks, categoryIds, firstWeekIndex, errors) {
   for (const task of tasks) {
     if (!task.name) {
       errors.push(`Task ${task.id} must include a name.`);
@@ -151,7 +158,7 @@ function validateTasks(tasks, categoryIds, errors) {
       errors.push(`Task ${task.id} estimateWeeks must be a non-negative number.`);
     }
 
-    if (task.earliestStartWeek !== null && task.earliestStartWeek !== undefined && !isIntegerAtLeast(task.earliestStartWeek, 1)) {
+    if (task.earliestStartWeek !== null && task.earliestStartWeek !== undefined && !isWeekIndexInRange(task.earliestStartWeek, firstWeekIndex)) {
       errors.push(`Task ${task.id} earliestStartWeek must be null or a positive integer.`);
     }
 
@@ -160,7 +167,7 @@ function validateTasks(tasks, categoryIds, errors) {
     }
 
     for (const override of task.resourceOverrides ?? []) {
-      if (!isIntegerAtLeast(override.weekIndex, 1)) {
+      if (!isWeekIndexInRange(override.weekIndex, firstWeekIndex)) {
         errors.push(`Task ${task.id} resource override weekIndex must be a positive integer.`);
       }
 
@@ -170,7 +177,7 @@ function validateTasks(tasks, categoryIds, errors) {
     }
 
     for (const vacation of task.vacations ?? []) {
-      if (!isIntegerAtLeast(vacation.weekIndex, 1)) {
+      if (!isWeekIndexInRange(vacation.weekIndex, firstWeekIndex)) {
         errors.push(`Task ${task.id} vacation weekIndex must be a positive integer.`);
       }
 
@@ -188,12 +195,15 @@ function validateTasks(tasks, categoryIds, errors) {
     }
 
     for (const interval of task.completedIntervals ?? []) {
-      if (!isIntegerAtLeast(interval.startWeek, 1)) {
-        errors.push(`Task ${task.id} completed interval startWeek must be a positive integer.`);
+      if (!isWeekIndexInRange(interval.startWeek, firstWeekIndex)) {
+        errors.push(`Task ${task.id} completed interval startWeek must be a valid week within the plan's schedulable range.`);
       }
 
-      if (!isIntegerAtLeast(interval.endWeek, interval.startWeek ?? 1)) {
-        errors.push(`Task ${task.id} completed interval endWeek must be on or after startWeek.`);
+      if (
+        !isIntegerAtLeast(interval.endWeek, interval.startWeek ?? 1) ||
+        !isWeekIndexInRange(interval.endWeek, firstWeekIndex)
+      ) {
+        errors.push(`Task ${task.id} completed interval endWeek must be on or after startWeek and within the plan's schedulable range.`);
       }
 
       if (!isNumberAtLeast(interval.allocatedUnits, 0)) {
@@ -214,7 +224,7 @@ function validateTasks(tasks, categoryIds, errors) {
         errors.push(`Task ${task.id} shift id must be a string.`);
       }
 
-      if (!isIntegerAtLeast(shift.anchorWeekIndex, 1)) {
+      if (!isWeekIndexInRange(shift.anchorWeekIndex, firstWeekIndex)) {
         errors.push(`Task ${task.id} shift anchorWeekIndex must be a positive integer.`);
       }
 
@@ -222,12 +232,12 @@ function validateTasks(tasks, categoryIds, errors) {
         errors.push(`Task ${task.id} shift weekDelta must be a non-negative number.`);
       }
 
-      if (!isIntegerAtLeast(shift.firstShiftedWeek, 1)) {
+      if (!isWeekIndexInRange(shift.firstShiftedWeek, firstWeekIndex)) {
         errors.push(`Task ${task.id} shift firstShiftedWeek must be a positive integer.`);
       }
 
       for (const entry of shift.sourceEntries ?? []) {
-        if (!isIntegerAtLeast(entry.weekIndex, 1)) {
+        if (!isWeekIndexInRange(entry.weekIndex, firstWeekIndex)) {
           errors.push(`Task ${task.id} shift source entry weekIndex must be a positive integer.`);
         }
 
@@ -298,15 +308,15 @@ function isKnownDependencyTargetType(type) {
   return type === 'task' || type === 'category';
 }
 
-function validateExternalDependencies(externalDependencies, taskIds, errors) {
+function validateExternalDependencies(externalDependencies, taskIds, firstWeekIndex, errors) {
   for (const dependency of externalDependencies) {
     if (!dependency.name) {
       errors.push(`External dependency ${dependency.id} must include a name.`);
     }
 
     const dueWeek = dependency.dueWeek ?? dependency.endWeek ?? dependency.startWeek;
-    if (!isIntegerAtLeast(dueWeek, 1)) {
-      errors.push(`External dependency ${dependency.id} dueWeek must be a positive integer.`);
+    if (!isWeekIndexInRange(dueWeek, firstWeekIndex)) {
+      errors.push(`External dependency ${dependency.id} dueWeek must be a valid week within the plan's schedulable range.`);
     }
 
     if (dependency.status !== undefined && !['yes', 'partial', 'no'].includes(dependency.status)) {
@@ -335,14 +345,14 @@ function validateWeeks(weeks, errors) {
   }
 }
 
-function validateSprints(sprints, weekIndexes, errors) {
+function validateSprints(sprints, firstWeekIndex, errors) {
   for (const sprint of sprints) {
     if (!sprint.name) {
       errors.push(`Sprint ${sprint.id} must include a name.`);
     }
 
-    if (!weekIndexes.has(sprint.startWeek) || !weekIndexes.has(sprint.endWeek)) {
-      errors.push(`Sprint ${sprint.id} must start and end on existing weeks.`);
+    if (!isWeekIndexInRange(sprint.startWeek, firstWeekIndex) || !isWeekIndexInRange(sprint.endWeek, firstWeekIndex)) {
+      errors.push(`Sprint ${sprint.id} must start and end within the plan's schedulable range.`);
     }
 
     if (sprint.startWeek > sprint.endWeek) {
@@ -359,7 +369,7 @@ function validateTeams(teams, errors) {
   }
 }
 
-function validateFreeDays(freedays, teamIds, errors) {
+function validateFreeDays(freedays, teamIds, firstWeekIndex, errors) {
   for (const freeday of freedays) {
     if (!teamIds.has(freeday.teamId)) {
       errors.push(`Free day ${freeday.id} references a missing team.`);
@@ -369,13 +379,13 @@ function validateFreeDays(freedays, teamIds, errors) {
       errors.push(`Free day ${freeday.id} must include a date or weekIndex.`);
     }
 
-    if (freeday.weekIndex !== undefined && freeday.weekIndex !== null && !isIntegerAtLeast(freeday.weekIndex, 1)) {
-      errors.push(`Free day ${freeday.id} weekIndex must be a positive integer.`);
+    if (freeday.weekIndex !== undefined && freeday.weekIndex !== null && !isWeekIndexInRange(freeday.weekIndex, firstWeekIndex)) {
+      errors.push(`Free day ${freeday.id} weekIndex must be a valid week within the plan's schedulable range.`);
     }
   }
 }
 
-function validateWeekResources(weekResources, teamIds, weekIndexes, errors) {
+function validateWeekResources(weekResources, teamIds, firstWeekIndex, errors) {
   const keys = new Set();
 
   for (const resource of weekResources) {
@@ -383,8 +393,8 @@ function validateWeekResources(weekResources, teamIds, weekIndexes, errors) {
       errors.push(`Week resource ${resource.id} references a missing team.`);
     }
 
-    if (!weekIndexes.has(resource.weekIndex)) {
-      errors.push(`Week resource ${resource.id} references a missing week.`);
+    if (!isWeekIndexInRange(resource.weekIndex, firstWeekIndex)) {
+      errors.push(`Week resource ${resource.id} weekIndex must be a valid week within the plan's schedulable range.`);
     }
 
     if (!isNumberAtLeast(resource.resourceCount, 0)) {
@@ -414,14 +424,14 @@ function validateInitialWeekResources(teams, weeks, weekResources, errors) {
   }
 }
 
-function validateSchedule(schedule, taskIds, weekIndexes, errors) {
+function validateSchedule(schedule, taskIds, firstWeekIndex, errors) {
   for (const item of schedule) {
     if (!taskIds.has(item.taskId)) {
       errors.push('Schedule entry references a missing task.');
     }
 
-    if (!weekIndexes.has(item.weekIndex)) {
-      errors.push(`Schedule entry for task ${item.taskId} references a missing week.`);
+    if (!isWeekIndexInRange(item.weekIndex, firstWeekIndex)) {
+      errors.push(`Schedule entry for task ${item.taskId} weekIndex must be a valid week within the plan's schedulable range.`);
     }
 
     if (!isNumberAtLeast(item.allocatedUnits, 0)) {
@@ -436,6 +446,16 @@ function isNumberAtLeast(value, minimum) {
 
 function isIntegerAtLeast(value, minimum) {
   return Number.isInteger(value) && value >= minimum;
+}
+
+// A week-indexed field's valid range is [firstWeekIndex, firstWeekIndex +
+// MAX_CALCULATED_WEEKS - 1] - the same horizon the scheduler itself enforces
+// (src/engine/scheduler.js clamps finalWeekCount to MAX_CALCULATED_WEEKS). Rejecting
+// anything outside that range here, at the validation boundary, is what makes it safe
+// to wire this validator into an untrusted-input load path (a shared link, a hand
+// edited JSON file): an absurd value never reaches the scheduler in the first place.
+function isWeekIndexInRange(value, firstWeekIndex) {
+  return Number.isInteger(value) && value >= firstWeekIndex && value <= firstWeekIndex + MAX_CALCULATED_WEEKS - 1;
 }
 
 function isNumberBetween(value, minimum, maximum) {

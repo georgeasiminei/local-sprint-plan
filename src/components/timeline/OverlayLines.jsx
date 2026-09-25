@@ -1,6 +1,6 @@
 import { LEFT_COLUMN_WIDTH } from './layout.js';
 import { getDependencyEndpoint, getDependencyEntityName, getEntityTasks } from '../../utils/dependencies.js';
-import { isPastWeek } from '../../engine/timeline.js';
+import { isCurrentWeek, isPastWeek } from '../../engine/timeline.js';
 
 export default function OverlayLines({ document, weekColumnWidth }) {
   const weeks = document.weeks ?? [];
@@ -66,20 +66,11 @@ function Marker({ index, weekColumnWidth, color, label, solid = false, widthClas
 
 function findTodayPosition(weeks) {
   const today = new Date();
-  const index = weeks.findIndex((week) => {
-    if (!week.startDate) {
-      return false;
-    }
-
-    const start = new Date(week.startDate);
-    const end = week.endDate ? new Date(`${week.endDate}T23:59:59`) : new Date(start);
-    if (!week.endDate) {
-      end.setDate(start.getDate() + 6);
-      end.setHours(23, 59, 59, 999);
-    }
-
-    return today >= start && today <= end;
-  });
+  // Use the engine's canonical isCurrentWeek (parses in local time) rather than
+  // re-parsing startDate as bare "YYYY-MM-DD" (UTC midnight per spec): the two used to
+  // disagree, so in positive UTC-offset timezones the today line vanished for the
+  // first hours of Monday even though isCurrentWeek elsewhere still matched.
+  const index = weeks.findIndex((week) => isCurrentWeek(week, today));
 
   if (index === -1) {
     return null;

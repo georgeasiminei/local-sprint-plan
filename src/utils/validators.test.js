@@ -153,4 +153,41 @@ describe('validatePlanDocument', () => {
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('Task task-1 status must be green, amber, or red.');
   });
+
+  it('accepts week resources, schedule entries, and sprints beyond the placeholder weeks array', () => {
+    // A document freshly out of expandCompactPlanDocument only has a MIN_VISIBLE_WEEKS
+    // placeholder `weeks` array (empty here, as the fixture default) - the scheduler
+    // expands it later. Validation must not reject data that legitimately reaches past
+    // that placeholder.
+    const result = validatePlanDocument(
+      createPlanFixture({
+        teams: [{ id: 'team-1', name: 'Team 1' }],
+        tasks: [{ id: 'task-1', name: 'One', priority: 1, estimateWeeks: 3 }],
+        weekResources: [
+          { id: 'wr-1', teamId: 'team-1', weekIndex: 1, resourceCount: 5 },
+          { id: 'wr-2', teamId: 'team-1', weekIndex: 40, resourceCount: 3 },
+        ],
+        schedule: [{ taskId: 'task-1', weekIndex: 40, allocatedUnits: 2 }],
+        sprints: [{ id: 'sprint-1', name: 'Sprint 1', startWeek: 39, endWeek: 40, order: 1, number: 1 }],
+      }),
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a week index far outside the plan\'s schedulable range', () => {
+    const result = validatePlanDocument(
+      createPlanFixture({
+        teams: [{ id: 'team-1', name: 'Team 1' }],
+        tasks: [{ id: 'task-1', name: 'One', priority: 1, estimateWeeks: 3 }],
+        schedule: [{ taskId: 'task-1', weekIndex: 1_000_000_000, allocatedUnits: 2 }],
+      }),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      "Schedule entry for task task-1 weekIndex must be a valid week within the plan's schedulable range.",
+    );
+  });
 });

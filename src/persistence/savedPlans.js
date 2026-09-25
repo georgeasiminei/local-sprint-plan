@@ -1,7 +1,14 @@
 import { compactPlanDocument, expandCompactPlanDocument } from './shareUrl.js';
 
-const STORAGE_KEY = 'timeline.savedPlans';
+// App-specific and versioned: GitHub Pages serves every project under a given account
+// from the same <user>.github.io origin, so a generic key like the previous
+// 'timeline.savedPlans' could be read, overwritten, or cleared by an unrelated project
+// on that same origin. The migration below moves any snapshots already saved under the
+// old key exactly once, so existing users do not lose their local snapshots.
+const STORAGE_KEY = 'local-sprint-plan.savedPlans.v1';
+const LEGACY_STORAGE_KEY = 'timeline.savedPlans';
 const BACKUP_VERSION = 1;
+let hasMigratedLegacyStorageKey = false;
 
 export function listSavedPlans() {
   return readSavedPlans().sort((a, b) => b.savedAt.localeCompare(a.savedAt));
@@ -79,12 +86,44 @@ export function restoreSavedPlansBackup(backup) {
 }
 
 function readSavedPlans() {
+  migrateLegacyStorageKeyOnce();
+
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed.filter(isSavedPlan) : [];
   } catch {
     return [];
+  }
+}
+
+// One-time move of snapshots saved under the old, un-namespaced key to the new
+// app-specific one (see the comment on STORAGE_KEY above). The old key is left in
+// place rather than deleted - it is simply never read again - so this cannot lose data
+// even if something about the migration itself goes wrong.
+function migrateLegacyStorageKeyOnce() {
+  if (hasMigratedLegacyStorageKey) {
+    return;
+  }
+
+  hasMigratedLegacyStorageKey = true;
+
+  try {
+    if (window.localStorage.getItem(STORAGE_KEY) !== null) {
+      return;
+    }
+
+    const legacyRaw = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!legacyRaw) {
+      return;
+    }
+
+    const parsed = JSON.parse(legacyRaw);
+    if (Array.isArray(parsed) && parsed.every(isSavedPlan)) {
+      window.localStorage.setItem(STORAGE_KEY, legacyRaw);
+    }
+  } catch {
+    // Nothing to migrate, or the legacy entry was not valid JSON - leave it alone.
   }
 }
 
